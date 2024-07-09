@@ -20,7 +20,8 @@
 
 //globals
 bool pause = false;
-double prevTime;
+double prevTime = 0; // used to make sure button presses work properly
+double timeOffset = 0;//used to offset time after pause
 
 
 const char* fragmentShaderSource = "\n\0";
@@ -29,12 +30,17 @@ void processInput(GLFWwindow* window) {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
 		glfwSetWindowShouldClose(window, true);
 	}
-	else if (GetAsyncKeyState(' ')) {
-		if (glfwGetTime() - prevTime > 0.2) {
+	else if (GetAsyncKeyState(' ') && glfwGetTime() - prevTime > 0.2) {
+			
 			prevTime = glfwGetTime();
+			if (!pause) {
+				timeOffset = glfwGetTime();
+			}
+			else {
+				glfwSetTime(timeOffset);
+			}
 			pause = !pause;
 			cout << pause << endl;
-		}
 		
 	}
 }
@@ -42,53 +48,26 @@ void framebuffer_size_callback(GLFWwindow* window, int w, int h) {
 	glViewport(0, 0, w, h);
 }
 
-vector<pair<GLfloat, GLfloat>> generateVertices(float r, int n) {
-    vector<pair<GLfloat, GLfloat>> circlePoints(n, {0, 0});
-    GLfloat degreeIncrement = (float)((360 / n) * PI / 180);
-
-    for (int i = 0; i < n; i++) {
-        GLfloat currentDegree = i * degreeIncrement;
-        circlePoints[i].first = r * cos(currentDegree);
-        circlePoints[i].second = r * sin(currentDegree);
-    }
-    return circlePoints;
-}
-
-void createCircle() {
-	glfwInit();
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Circle", NULL, NULL);
-	glfwMakeContextCurrent(window);
-	gladLoadGL();
-	glViewport(0, 0, WIDTH, HEIGHT);
-	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-
-	vector<pair<GLfloat, GLfloat>> circlePoints = generateVertices(RADIUS, SEGMENTS);
-	
-
-	int n = (circlePoints.size() * 3) + 3;
-	GLfloat* vertices = new GLfloat[n];
+void GenerateCircle(GLfloat*& vertices, GLuint*& EBOIndices, int n) {
 	vertices[0] = 0.0;
 	vertices[1] = 0.0;
 	vertices[2] = 0.0;
 	int pos = 2;
-	for (int i = 0; i < circlePoints.size(); i++) {
+	int c = 0;
+	GLfloat degreeIncrement = glm::radians((float)(360 / SEGMENTS));
+	while (pos < n - 1) {
+		GLfloat currentDegree = c * degreeIncrement;
 		pos++;
-		vertices[pos] = circlePoints[i].first;
+		vertices[pos] = (GLfloat)(RADIUS * cos(currentDegree));
 		pos++;
-		vertices[pos] = circlePoints[i].second;
+		vertices[pos] = (GLfloat)(RADIUS * sin(currentDegree));
 		pos++;
-		vertices[pos] = 0.0f;
+		vertices[pos] = (GLfloat)0.0;
+		c++;
 	}
-	
-	int EBOSize = (circlePoints.size()*3)+3;
-	GLuint* EBOIndices = new GLuint[EBOSize];
 	int i = 0;
 	int curr = 1;
-	while (i < EBOSize-6) {
+	while (i < n - 6) {
 		EBOIndices[i] = 0;
 		i++;
 		EBOIndices[i] = curr;
@@ -103,20 +82,17 @@ void createCircle() {
 	i++;
 	EBOIndices[i] = curr;
 
-	//Circle c;
-	//c.vertices = vertices;
-	
-	Shader shader("VertexShader", "FragmentShader");
-	
-	
+}
+//this is fine for my purpose currently. but it might be problematic later with different sized shit
+GLuint* CreateBuffers(GLfloat* &vertices, GLuint*& EBOIndices, int n) {
+	GLuint* buffers = new GLuint[3];
+	GLuint VAO, VBO, EBO;
 
-	GLuint VAO, VBO, EBO; 
+	glGenVertexArrays(1, &VAO);
+	glBindVertexArray(VAO);
 
-	glGenVertexArrays(1, &VAO); 
-	glBindVertexArray(VAO); 
-
-	glGenBuffers(1, &VBO); 
-	glBindBuffer(GL_ARRAY_BUFFER, VBO); 
+	glGenBuffers(1, &VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	glBufferData(GL_ARRAY_BUFFER, n * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
 
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
@@ -124,29 +100,49 @@ void createCircle() {
 
 	glGenBuffers(1, &EBO);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-	//maybe n instead of EBOSize in the next line
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, EBOSize * sizeof(GLuint), EBOIndices, GL_STATIC_DRAW);
+
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, n * sizeof(GLuint), EBOIndices, GL_STATIC_DRAW);
 	glClearColor(0.5f, 0.8f, 1.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
+
+	buffers[0] = VAO;
+	buffers[1] = VBO;
+	buffers[2] = EBO;
+	return buffers;
+	
+}
+
+void BeginSim() {
+	//create window
+	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Circle", NULL, NULL);
+	glfwMakeContextCurrent(window);
+	gladLoadGL();
+	glViewport(0, 0, WIDTH, HEIGHT);
+	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+	//generate a circle
+	int n = (SEGMENTS * 3) + 3;
+	GLfloat* vertices = new GLfloat[n];
+	GLuint* EBOIndices = new GLuint[n];
+	GenerateCircle(vertices, EBOIndices, n);
+
+
+	Shader shader("VertexShader", "FragmentShader");
+	
+	GLuint* buffers = CreateBuffers(vertices, EBOIndices, n);
+	GLuint VAO = buffers[0], VBO = buffers[1], EBO = buffers[2];
+	
 	glfwSwapBuffers(window);
 
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	bool down = true;
-	int dampenCount = 0;
-	float dampening = 0.0;
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 	while (!glfwWindowShouldClose(window)) {
 		processInput(window);
 		if (!pause) {
-			double time = glfwGetTime();
-			//cout << c.vertices[1] << endl;
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 			shader.useShader();
 			//initialize our space matrices 
 			glm::mat4 model = glm::mat4(1.0f);
-			//glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -3.0f));
-			//glm::mat4 proj = glm::perspective(glm::radians(45.0f), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f);
-			//model = glm::rotate(model, (float)glfwGetTime(), glm::vec3(0.0f, 0.0f, 1.0f));
 			glm::mat4 view = glm::mat4(1.0f);
 			glm::mat4 proj = glm::mat4(1.0f);
 			//move the whole world around the camera rather than
@@ -160,7 +156,7 @@ void createCircle() {
 			//45 is standard
 			//0.1 clip close is standard
 			proj = glm::perspective(glm::radians(45.0f), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f);
-			model = glm::rotate(model, (float)glfwGetTime(), glm::vec3(1.0f, 1.0f, 0.0f));
+			model = glm::rotate(model, (float)(glfwGetTime()), glm::vec3(1.0f, 1.0f, 0.0f));
 			//send the information to the shader
 			int modelLoc = glGetUniformLocation(shader.shaderID, "model");
 			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
@@ -171,27 +167,12 @@ void createCircle() {
 
 			glBindVertexArray(VAO);
 
-
-			//apply gravity
-			/*if (c.vertices[1] - RADIUS > -1) {
-				int i = 0;
-				while (i < n) {
-					i++;
-					c.vertices[i] -= 0.001;
-					i++;
-					i++;
-				}
-			}*/
-
 			glBufferData(GL_ARRAY_BUFFER, n * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
-
 
 			glDrawElements(GL_TRIANGLES, n, GL_UNSIGNED_INT, 0);
 			glfwSwapBuffers(window);
 		}
-		
 		glfwPollEvents();
-		
 	}
 
 	glDeleteVertexArrays(1, &VAO);
@@ -202,15 +183,18 @@ void createCircle() {
 	delete[] EBOIndices;
 	delete[] vertices;
 	glfwTerminate();
-
-
 	return;
-
 }
 
 int main() {
+	//Initialization
+	glfwInit();
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	prevTime = glfwGetTime();
-	createCircle();
+	
+	BeginSim();
 	return 0;
 }
 
