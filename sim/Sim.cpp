@@ -3,13 +3,13 @@
 #include <GLFW/glfw3.h>
 #include <vector>
 #include <cmath>
-#include "Circle.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <windows.h>   // for MS Windows
-//#include <GL/glut.h>
-using namespace std;
+
+#include "Circle.h"
+#include "Shader.h"
 
 //constants
 #define PI 3.1415926535897932384626433
@@ -22,23 +22,8 @@ using namespace std;
 bool pause = false;
 double prevTime;
 
-const char* vertexShaderSource = "#version 330 core\n"
-"layout (location = 0) in vec3 aPos;\n"
-"uniform mat4 model;\n"
-"uniform mat4 view;\n"
-"uniform mat4 proj;\n"
-"void main()\n"
-"{\n"
-"    gl_Position = proj * view * model * vec4(aPos, 1.0);\n"
-"}\0";
 
-
-const char* fragmentShaderSource = "#version 330 core\n"
-"out vec4 FragColor;\n"
-"void main()\n"
-"{\n"
-"    FragColor = vec4(0.7f, 0.0f, 1.0f, 1.0f);\n"
-"}\n\0";
+const char* fragmentShaderSource = "\n\0";
 
 void processInput(GLFWwindow* window) {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
@@ -78,7 +63,7 @@ void createCircle() {
 	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Circle", NULL, NULL);
 	glfwMakeContextCurrent(window);
 	gladLoadGL();
-	glViewport(0, 0, 1000, 1000);
+	glViewport(0, 0, WIDTH, HEIGHT);
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
 	vector<pair<GLfloat, GLfloat>> circlePoints = generateVertices(RADIUS, SEGMENTS);
@@ -121,22 +106,9 @@ void createCircle() {
 	//Circle c;
 	//c.vertices = vertices;
 	
-
-	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-	glCompileShader(vertexShader);
-
-	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-	glCompileShader(fragmentShader);
-
-	GLuint shaderProgram = glCreateProgram();
-	glAttachShader(shaderProgram, vertexShader);
-	glAttachShader(shaderProgram, fragmentShader);
-
-	glLinkProgram(shaderProgram);
-	glDeleteShader(vertexShader);
-	glDeleteShader(fragmentShader);
+	Shader shader("VertexShader", "FragmentShader");
+	
+	
 
 	GLuint VAO, VBO, EBO; 
 
@@ -169,7 +141,7 @@ void createCircle() {
 			double time = glfwGetTime();
 			//cout << c.vertices[1] << endl;
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-			glUseProgram(shaderProgram);
+			shader.useShader();
 			//initialize our space matrices 
 			glm::mat4 model = glm::mat4(1.0f);
 			//glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -3.0f));
@@ -190,11 +162,11 @@ void createCircle() {
 			proj = glm::perspective(glm::radians(45.0f), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f);
 			model = glm::rotate(model, (float)glfwGetTime(), glm::vec3(1.0f, 1.0f, 0.0f));
 			//send the information to the shader
-			int modelLoc = glGetUniformLocation(shaderProgram, "model");
+			int modelLoc = glGetUniformLocation(shader.shaderID, "model");
 			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-			int viewLoc = glGetUniformLocation(shaderProgram, "view");
+			int viewLoc = glGetUniformLocation(shader.shaderID, "view");
 			glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-			int projLoc = glGetUniformLocation(shaderProgram, "proj");
+			int projLoc = glGetUniformLocation(shader.shaderID, "proj");
 			glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(proj));
 
 			glBindVertexArray(VAO);
@@ -225,7 +197,7 @@ void createCircle() {
 	glDeleteVertexArrays(1, &VAO);
 	glDeleteBuffers(1, &VBO);
 	glDeleteBuffers(1, &EBO);
-	glDeleteShader(shaderProgram);
+	shader.Delete();
 	glfwDestroyWindow(window);
 	delete[] EBOIndices;
 	delete[] vertices;
