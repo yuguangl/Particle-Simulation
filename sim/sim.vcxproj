@@ -137,16 +137,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Boundry.cpp" />
     <ClCompile Include="glad.c" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="Sim.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Boundry.h" />
     <ClInclude Include="Circle.h" />
     <ClInclude Include="Shader.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="StillVertexShader" />
     <None Include="FragmentShader" />
     <None Include="VertexShader" />
   </ItemGroup>

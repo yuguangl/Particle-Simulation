@@ -10,6 +10,7 @@
 
 #include "Circle.h"
 #include "Shader.h"
+#include "Boundry.h"
 
 //constants
 #define PI 3.1415926535897932384626433
@@ -46,6 +47,11 @@ void processInput(GLFWwindow* window) {
 }
 void framebuffer_size_callback(GLFWwindow* window, int w, int h) {
 	glViewport(0, 0, w, h);
+}
+
+//x and y coordinates are opposite corner points on the rectangle.
+void GenerateRect(GLfloat*& vertices, GLuint*& EBOIndices) {
+	
 }
 
 void GenerateCircle(GLfloat*& vertices, GLuint*& EBOIndices, int n) {
@@ -120,14 +126,19 @@ void BeginSim() {
 	glViewport(0, 0, WIDTH, HEIGHT);
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
+	Boundry boundry(5, 5);
+	boundry.createBoundry();
+
 	//generate a circle
 	int n = (SEGMENTS * 3) + 3;
 	GLfloat* vertices = new GLfloat[n];
 	GLuint* EBOIndices = new GLuint[n];
 	GenerateCircle(vertices, EBOIndices, n);
-
+	
+	
 
 	Shader shader("VertexShader", "FragmentShader");
+	Shader boundryShader("VertexShader", "FragmentShader");
 	
 	GLuint* buffers = CreateBuffers(vertices, EBOIndices, n);
 	GLuint VAO = buffers[0], VBO = buffers[1], EBO = buffers[2];
@@ -138,9 +149,10 @@ void BeginSim() {
 
 	while (!glfwWindowShouldClose(window)) {
 		processInput(window);
+		shader.useShader();
 		if (!pause) {
+			glBindVertexArray(VAO);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-			shader.useShader();
 			//initialize our space matrices 
 			glm::mat4 model = glm::mat4(1.0f);
 			glm::mat4 view = glm::mat4(1.0f);
@@ -148,7 +160,8 @@ void BeginSim() {
 			//move the whole world around the camera rather than
 			//moving the camera around the world. so lets just move the world
 			//back a little bit
-			view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+			view = glm::translate(view, glm::vec3(0.0f, 0.0f, -10.0f));
+			model = glm::translate(model, glm::vec3(3.0f, 3.0f, -7.0f));
 			//now lets create the perspective. 
 			//even though im working in 2d, this just makes things easier
 			//to work with as i have a larger range of numbers to work with
@@ -156,7 +169,7 @@ void BeginSim() {
 			//45 is standard
 			//0.1 clip close is standard
 			proj = glm::perspective(glm::radians(45.0f), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f);
-			model = glm::rotate(model, (float)(glfwGetTime()), glm::vec3(1.0f, 1.0f, 0.0f));
+			//model = glm::rotate(model, (float)(glfwGetTime()), glm::vec3(1.0f, 1.0f, 0.0f));
 			//send the information to the shader
 			int modelLoc = glGetUniformLocation(shader.shaderID, "model");
 			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
@@ -165,11 +178,36 @@ void BeginSim() {
 			int projLoc = glGetUniformLocation(shader.shaderID, "proj");
 			glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(proj));
 
-			glBindVertexArray(VAO);
+
 
 			glBufferData(GL_ARRAY_BUFFER, n * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
 
 			glDrawElements(GL_TRIANGLES, n, GL_UNSIGNED_INT, 0);
+			
+			boundryShader.useShader();
+			glBindVertexArray(boundry.VAO);
+
+			model = glm::mat4(1.0f);
+			view = glm::mat4(1.0f);
+			proj = glm::mat4(1.0f);
+
+			view = glm::translate(view, glm::vec3(0.0f, 0.0f, -10.0f));
+			model = glm::translate(model, glm::vec3(0.0f, 0.0f, -7.0f));
+			proj = glm::perspective(glm::radians(45.0f), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f);
+
+			modelLoc = glGetUniformLocation(boundryShader.shaderID, "model");
+			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+			viewLoc = glGetUniformLocation(boundryShader.shaderID, "view");
+			glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+			projLoc = glGetUniformLocation(boundryShader.shaderID, "proj");
+			glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(proj));
+			
+
+			glBufferData(GL_ARRAY_BUFFER, 48 * sizeof(GLfloat), boundry.vertices, GL_STATIC_DRAW);
+
+			glDrawElements(GL_TRIANGLES, 24, GL_UNSIGNED_INT, 0);
+
+			
 			glfwSwapBuffers(window);
 		}
 		glfwPollEvents();

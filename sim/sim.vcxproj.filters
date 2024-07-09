@@ -30,12 +30,18 @@
     <ClCompile Include="Shader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Boundry.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Circle.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="Shader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Circle.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Boundry.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -44,6 +50,9 @@
       <Filter>Resource Files\Shaders</Filter>
     </None>
     <None Include="FragmentShader">
+      <Filter>Resource Files\Shaders</Filter>
+    </None>
+    <None Include="StillVertexShader">
       <Filter>Resource Files\Shaders</Filter>
     </None>
   </ItemGroup>
