@@ -139,7 +139,6 @@
   <ItemGroup>
     <ClCompile Include="Boundry.cpp" />
     <ClCompile Include="glad.c" />
-    <ClCompile Include="Main.cpp" />
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="Sim.cpp" />
   </ItemGroup>

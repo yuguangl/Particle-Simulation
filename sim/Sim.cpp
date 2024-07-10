@@ -18,18 +18,21 @@
 //constants
 #define PI 3.1415926535897932384626433
 #define SEGMENTS 25 // just dont go over 90 for some reason
-#define RADIUS 30 // <= 1
-#define WIDTH 1500
-#define HEIGHT 1500
+#define RADIUS 25 // <= 1
+#define WIDTH 1000
+#define HEIGHT 1000
 #define NUM_CIRCLES 10
-#define FPS 60
+#define TARGET_FPS 60
+#define G 9
 
 //globals
 bool pause = false; //obvious
 double prevTime = 0; // used to make sure button presses work properly
 double timeOffset = 0;//used to offset time after pause
-int frameRate = 0;
-double finalTime = 0; //used for frameRate control
+int frames = 0;
+double finalTime = 0; //used for fps control
+double initTime = 0; //use for fps control
+double realTime; //for testing purposes
 
 void processInput(GLFWwindow* window) {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
@@ -114,7 +117,71 @@ GLuint* CreateBuffers(GLfloat* &vertices, GLuint*& EBOIndices, int n) {
 	buffers[1] = VBO;
 	buffers[2] = EBO;
 	return buffers;
-	
+}
+
+void MakeCircleGrid(vector<Circle>& circles) {
+	int n = (SEGMENTS * 3) + 3;
+	int j = 0;
+	int i = 0;
+	int counter = 0;
+	while (counter < NUM_CIRCLES) {
+		int max = (WIDTH-RADIUS) / ((RADIUS * 3));
+		//cout << max << endl;
+		if (i % max == 0) { //calculate the 50 to be less than the width
+			j++;
+			i = 0;
+		}
+		Circle c;
+		GLfloat* vertices = new GLfloat[n];
+		GLuint* EBOIndices = new GLuint[n];
+		GenerateCircle(vertices, EBOIndices, n);
+		c.EBOIndices = EBOIndices;
+		c.vertices = vertices;
+		c.size = n;
+		c.x = RADIUS + i * RADIUS * 3;
+		c.y = RADIUS + j * RADIUS * 3;
+		c.xVel = 0;
+		c.yVel = 0;
+		circles.push_back(c);
+		i++;
+		counter++;
+	}
+}
+
+void Update(vector<Circle>& circles) {
+	frames++;
+	finalTime = glfwGetTime();
+
+	//handle collisions and stuff
+	if (finalTime - initTime >= (1.0 / 60)) {
+		int fps = frames / (finalTime - initTime);
+		if (fps < TARGET_FPS) {
+			cout << "LOW FRAME RATE DETECTED: " << fps << endl;
+		}
+		else {
+			//cout << fps << endl;
+		}
+
+		initTime = glfwGetTime();
+		frames = 0;
+		cout << circles[0].yVel << endl;
+		float dampening = 0.1;
+		for (int i = 0; i < NUM_CIRCLES; i++) {
+			
+			if (circles[i].y + RADIUS == HEIGHT) {
+				circles[i].y += circles[i].yVel;
+			}
+			if (circles[i].y + RADIUS < HEIGHT) {
+				circles[i].yVel += G * (1.0 / 60); //technically a little off I hope it doesnt cause any issues
+				circles[i].y += circles[i].yVel;
+			}
+			if (circles[i].y + RADIUS > HEIGHT) { //adjust height
+				circles[i].y = HEIGHT - RADIUS;
+				circles[i].yVel *= -1.0 * dampening;
+			}
+			
+		}
+	}
 }
 
 void BeginSim() {
@@ -131,19 +198,9 @@ void BeginSim() {
 	//generate circles
 	vector<Circle> circles;
 	int n = (SEGMENTS * 3) + 3;
-	for (int i = 0; i < NUM_CIRCLES; i++) {
-		Circle c;
-		GLfloat* vertices = new GLfloat[n];
-		GLuint* EBOIndices = new GLuint[n]; 
-		GenerateCircle(vertices, EBOIndices, n);
-		c.EBOIndices = EBOIndices;
-		c.vertices = vertices;
-		c.size = n;
-		c.x = 100 + i * RADIUS * 3;
-		c.y = 100;
-		circles.push_back(c);
-
-	}
+	MakeCircleGrid(circles);
+	
+	
 	
 	Shader shader("VertexShader", "FragmentShader");
 	Shader boundryShader("VertexShader", "FragmentShader");
@@ -160,29 +217,27 @@ void BeginSim() {
 		VAO[i] = buffers[0], VBO[i] = buffers[1], EBO[i] = buffers[2];
 	}
 
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 	int modelLoc = glGetUniformLocation(shader.shaderID, "model");
 	int projLoc = glGetUniformLocation(shader.shaderID, "proj");
 
 	glm::mat4 proj = glm::mat4(1.0f);
-	proj = glm::ortho(0.0f, 1500.0f, 1500.0f, 0.0f, -1.0f, 1.0f);
+	proj = glm::ortho(0.0f, (float)WIDTH, (float)HEIGHT, 0.0f, -1.0f, 1.0f);
 	
-	double initTime = glfwGetTime();
+	initTime = glfwGetTime();
 	while (!glfwWindowShouldClose(window)) {
-		//cout << frameRate / (finalTime - initTime) << endl;
-		//frameRate = 0;
 		processInput(window);
 		shader.useShader();
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-			//make force apply with time
+		if (!pause) {
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 			for (int i = 0; i < NUM_CIRCLES; i++) {
 				glBindVertexArray(VAO[i]);
 				glBindBuffer(GL_ARRAY_BUFFER, VBO[i]);
 
 				glm::mat4 model = glm::mat4(1.0f);
 				model = glm::translate(model, glm::vec3(circles[i].x, circles[i].y, 0.0f));
-				
+
 				glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 				glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(proj));
 
@@ -190,22 +245,14 @@ void BeginSim() {
 
 				glDrawElements(GL_TRIANGLES, n, GL_UNSIGNED_INT, 0);
 			}
-			
-			glfwSwapBuffers(window);
-		frameRate++;
-		finalTime = glfwGetTime();
 
-		//NOTE:
-		if (finalTime - initTime >= (1.0/60)) {
-			cout << frameRate / (finalTime - initTime) << endl;
-			initTime = glfwGetTime();
-			frameRate = 0;
-			for (int i = 0; i < NUM_CIRCLES; i++) {
-				circles[i].y += 1;
-			}
+			glfwSwapBuffers(window);
+			Update(circles);
 		}
+		
 	glfwPollEvents();
 	}
+
 	//TODO: RUN VALGRIND
 	for (int i = 0; i < NUM_CIRCLES; i++) {
 		glDeleteVertexArrays(1, &VAO[i]);

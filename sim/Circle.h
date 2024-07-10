@@ -10,7 +10,8 @@ struct Circle {
 	int size;
 	GLfloat* vertices;
 	GLuint* EBOIndices;
-	float velocity[2];
+	float xVel;
+	float yVel;
 	int x;
 	int y;
 
