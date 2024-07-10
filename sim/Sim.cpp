@@ -196,7 +196,7 @@ void BeginSim() {
 		finalTime = glfwGetTime();
 
 		//NOTE:
-		if (finalTime - initTime >= 1/60) {
+		if (finalTime - initTime >= (1.0/60)) {
 			cout << frameRate / (finalTime - initTime) << endl;
 			initTime = glfwGetTime();
 			frameRate = 0;
