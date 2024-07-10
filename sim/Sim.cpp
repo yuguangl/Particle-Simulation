@@ -7,6 +7,9 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <windows.h>   // for MS Windows
+#include <time.h>
+//#include <gl/glut.h>
+
 
 #include "Circle.h"
 #include "Shader.h"
@@ -14,18 +17,19 @@
 
 //constants
 #define PI 3.1415926535897932384626433
-#define SEGMENTS 90 // just dont go over 90 for some reason
-#define RADIUS .5 // <= 1
-#define WIDTH 1000
-#define HEIGHT 1000
+#define SEGMENTS 25 // just dont go over 90 for some reason
+#define RADIUS 30 // <= 1
+#define WIDTH 1500
+#define HEIGHT 1500
+#define NUM_CIRCLES 10
+#define FPS 60
 
 //globals
-bool pause = false;
+bool pause = false; //obvious
 double prevTime = 0; // used to make sure button presses work properly
 double timeOffset = 0;//used to offset time after pause
-
-
-const char* fragmentShaderSource = "\n\0";
+int frameRate = 0;
+double finalTime = 0; //used for frameRate control
 
 void processInput(GLFWwindow* window) {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
@@ -47,11 +51,6 @@ void processInput(GLFWwindow* window) {
 }
 void framebuffer_size_callback(GLFWwindow* window, int w, int h) {
 	glViewport(0, 0, w, h);
-}
-
-//x and y coordinates are opposite corner points on the rectangle.
-void GenerateRect(GLfloat*& vertices, GLuint*& EBOIndices) {
-	
 }
 
 void GenerateCircle(GLfloat*& vertices, GLuint*& EBOIndices, int n) {
@@ -126,100 +125,101 @@ void BeginSim() {
 	glViewport(0, 0, WIDTH, HEIGHT);
 	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
-	Boundry boundry(5, 5);
+	Boundry boundry(5, 5);//actually make the length and width do something cuz rn it does nothing
 	boundry.createBoundry();
 
-	//generate a circle
+	//generate circles
+	vector<Circle> circles;
 	int n = (SEGMENTS * 3) + 3;
-	GLfloat* vertices = new GLfloat[n];
-	GLuint* EBOIndices = new GLuint[n];
-	GenerateCircle(vertices, EBOIndices, n);
-	
-	
+	for (int i = 0; i < NUM_CIRCLES; i++) {
+		Circle c;
+		GLfloat* vertices = new GLfloat[n];
+		GLuint* EBOIndices = new GLuint[n]; 
+		GenerateCircle(vertices, EBOIndices, n);
+		c.EBOIndices = EBOIndices;
+		c.vertices = vertices;
+		c.size = n;
+		c.x = 100 + i * RADIUS * 3;
+		c.y = 100;
+		circles.push_back(c);
 
+	}
+	
 	Shader shader("VertexShader", "FragmentShader");
 	Shader boundryShader("VertexShader", "FragmentShader");
 	
-	GLuint* buffers = CreateBuffers(vertices, EBOIndices, n);
-	GLuint VAO = buffers[0], VBO = buffers[1], EBO = buffers[2];
-	
 	glfwSwapBuffers(window);
 
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	
+	GLuint* VAO = new GLuint[NUM_CIRCLES];
+	GLuint* VBO = new GLuint[NUM_CIRCLES];
+	GLuint* EBO = new GLuint[NUM_CIRCLES];
 
-	while (!glfwWindowShouldClose(window)) {
-		processInput(window);
-		shader.useShader();
-		if (!pause) {
-			glBindVertexArray(VAO);
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-			//initialize our space matrices 
-			glm::mat4 model = glm::mat4(1.0f);
-			glm::mat4 view = glm::mat4(1.0f);
-			glm::mat4 proj = glm::mat4(1.0f);
-			//move the whole world around the camera rather than
-			//moving the camera around the world. so lets just move the world
-			//back a little bit
-			view = glm::translate(view, glm::vec3(0.0f, 0.0f, -10.0f));
-			model = glm::translate(model, glm::vec3(3.0f, 3.0f, -7.0f));
-			//now lets create the perspective. 
-			//even though im working in 2d, this just makes things easier
-			//to work with as i have a larger range of numbers to work with
-			//than just the clip space.
-			//45 is standard
-			//0.1 clip close is standard
-			proj = glm::perspective(glm::radians(45.0f), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f);
-			//model = glm::rotate(model, (float)(glfwGetTime()), glm::vec3(1.0f, 1.0f, 0.0f));
-			//send the information to the shader
-			int modelLoc = glGetUniformLocation(shader.shaderID, "model");
-			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-			int viewLoc = glGetUniformLocation(shader.shaderID, "view");
-			glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-			int projLoc = glGetUniformLocation(shader.shaderID, "proj");
-			glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(proj));
-
-
-
-			glBufferData(GL_ARRAY_BUFFER, n * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
-
-			glDrawElements(GL_TRIANGLES, n, GL_UNSIGNED_INT, 0);
-			
-			boundryShader.useShader();
-			glBindVertexArray(boundry.VAO);
-
-			model = glm::mat4(1.0f);
-			view = glm::mat4(1.0f);
-			proj = glm::mat4(1.0f);
-
-			view = glm::translate(view, glm::vec3(0.0f, 0.0f, -10.0f));
-			model = glm::translate(model, glm::vec3(0.0f, 0.0f, -7.0f));
-			proj = glm::perspective(glm::radians(45.0f), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f);
-
-			modelLoc = glGetUniformLocation(boundryShader.shaderID, "model");
-			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-			viewLoc = glGetUniformLocation(boundryShader.shaderID, "view");
-			glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-			projLoc = glGetUniformLocation(boundryShader.shaderID, "proj");
-			glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(proj));
-			
-
-			glBufferData(GL_ARRAY_BUFFER, 48 * sizeof(GLfloat), boundry.vertices, GL_STATIC_DRAW);
-
-			glDrawElements(GL_TRIANGLES, 24, GL_UNSIGNED_INT, 0);
-
-			
-			glfwSwapBuffers(window);
-		}
-		glfwPollEvents();
+	for (int i = 0; i < NUM_CIRCLES; i++) {
+		GLuint* buffers = CreateBuffers(circles[i].vertices, circles[i].EBOIndices, n);
+		VAO[i] = buffers[0], VBO[i] = buffers[1], EBO[i] = buffers[2];
 	}
 
-	glDeleteVertexArrays(1, &VAO);
-	glDeleteBuffers(1, &VBO);
-	glDeleteBuffers(1, &EBO);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+	int modelLoc = glGetUniformLocation(shader.shaderID, "model");
+	int projLoc = glGetUniformLocation(shader.shaderID, "proj");
+
+	glm::mat4 proj = glm::mat4(1.0f);
+	proj = glm::ortho(0.0f, 1500.0f, 1500.0f, 0.0f, -1.0f, 1.0f);
+	
+	double initTime = glfwGetTime();
+	while (!glfwWindowShouldClose(window)) {
+		//cout << frameRate / (finalTime - initTime) << endl;
+		//frameRate = 0;
+		processInput(window);
+		shader.useShader();
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			//make force apply with time
+			for (int i = 0; i < NUM_CIRCLES; i++) {
+				glBindVertexArray(VAO[i]);
+				glBindBuffer(GL_ARRAY_BUFFER, VBO[i]);
+
+				glm::mat4 model = glm::mat4(1.0f);
+				model = glm::translate(model, glm::vec3(circles[i].x, circles[i].y, 0.0f));
+				
+				glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+				glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(proj));
+
+				glBufferData(GL_ARRAY_BUFFER, n * sizeof(GLfloat), circles[i].vertices, GL_STATIC_DRAW);
+
+				glDrawElements(GL_TRIANGLES, n, GL_UNSIGNED_INT, 0);
+			}
+			
+			glfwSwapBuffers(window);
+		frameRate++;
+		finalTime = glfwGetTime();
+
+		//NOTE:
+		if (finalTime - initTime >= 1/60) {
+			cout << frameRate / (finalTime - initTime) << endl;
+			initTime = glfwGetTime();
+			frameRate = 0;
+			for (int i = 0; i < NUM_CIRCLES; i++) {
+				circles[i].y += 1;
+			}
+		}
+	glfwPollEvents();
+	}
+	//TODO: RUN VALGRIND
+	for (int i = 0; i < NUM_CIRCLES; i++) {
+		glDeleteVertexArrays(1, &VAO[i]);
+		glDeleteBuffers(1, &VBO[i]);
+		glDeleteBuffers(1, &EBO[i]);
+	}
+	
 	shader.Delete();
 	glfwDestroyWindow(window);
-	delete[] EBOIndices;
-	delete[] vertices;
+	for (int i = 0; i < NUM_CIRCLES; i++) {
+		delete[] circles[i].EBOIndices;
+		delete[] circles[i].vertices;
+	}
+	
 	glfwTerminate();
 	return;
 }

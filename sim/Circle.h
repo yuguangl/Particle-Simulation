@@ -11,5 +11,7 @@ struct Circle {
 	GLfloat* vertices;
 	GLuint* EBOIndices;
 	float velocity[2];
+	int x;
+	int y;
 
 };
