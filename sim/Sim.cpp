@@ -18,12 +18,12 @@
 //constants
 #define PI 3.1415926535897932384626433
 #define SEGMENTS 25 // just dont go over 90 for some reason
-#define RADIUS 25 // <= 1
+#define RADIUS 20 // <= 1
 #define WIDTH 1000
 #define HEIGHT 1000
-#define NUM_CIRCLES 10
+#define NUM_CIRCLES 4
 #define TARGET_FPS 60
-#define G 9
+#define G 10
 
 //globals
 bool pause = false; //obvious
@@ -32,7 +32,12 @@ double timeOffset = 0;//used to offset time after pause
 int frames = 0;
 double finalTime = 0; //used for fps control
 double initTime = 0; //use for fps control
+double finalTime2 = 0;
+double initTime2 = 0;
 double realTime; //for testing purposes
+int frames2 = 0;
+float dampening = 0.5;
+int c = 0;
 
 void processInput(GLFWwindow* window) {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
@@ -48,8 +53,6 @@ void processInput(GLFWwindow* window) {
 				glfwSetTime(timeOffset);
 			}
 			pause = !pause;
-			cout << pause << endl;
-		
 	}
 }
 void framebuffer_size_callback(GLFWwindow* window, int w, int h) {
@@ -124,6 +127,7 @@ void MakeCircleGrid(vector<Circle>& circles) {
 	int j = 0;
 	int i = 0;
 	int counter = 0;
+
 	while (counter < NUM_CIRCLES) {
 		int max = (WIDTH-RADIUS) / ((RADIUS * 3));
 		//cout << max << endl;
@@ -138,10 +142,10 @@ void MakeCircleGrid(vector<Circle>& circles) {
 		c.EBOIndices = EBOIndices;
 		c.vertices = vertices;
 		c.size = n;
-		c.x = RADIUS + i * RADIUS * 3;
-		c.y = RADIUS + j * RADIUS * 3;
-		c.xVel = 0;
-		c.yVel = 0;
+		c.x = RADIUS* 2 + j * RADIUS * 3;
+		c.y = RADIUS + i * RADIUS * 3;
+		c.xAcc = 0;
+		c.yAcc = G;
 		circles.push_back(c);
 		i++;
 		counter++;
@@ -150,37 +154,41 @@ void MakeCircleGrid(vector<Circle>& circles) {
 
 void Update(vector<Circle>& circles) {
 	frames++;
+	frames2++;
 	finalTime = glfwGetTime();
-
+	finalTime2 = glfwGetTime();
+	//TODO: make something that prints to the screen instead of cout
 	//handle collisions and stuff
-	if (finalTime - initTime >= (1.0 / 60)) {
-		int fps = frames / (finalTime - initTime);
+	if (finalTime2 - initTime2 >= 1.0) {
+		int fps = frames2 / (finalTime2 - initTime2);
 		if (fps < TARGET_FPS) {
 			cout << "LOW FRAME RATE DETECTED: " << fps << endl;
 		}
-		else {
-			//cout << fps << endl;
-		}
+		frames2 = 0;
+		initTime2 = glfwGetTime();
+	}
+	float timeStep = 0.05;//(1.0 / 60);
+	if (finalTime - initTime >= timeStep) { 
 
-		initTime = glfwGetTime();
-		frames = 0;
-		cout << circles[0].yVel << endl;
-		float dampening = 0.1;
 		for (int i = 0; i < NUM_CIRCLES; i++) {
-			
-			if (circles[i].y + RADIUS == HEIGHT) {
-				circles[i].y += circles[i].yVel;
+			//TODO: replace with verlet integration
+			if (circles[i].y + RADIUS <= HEIGHT) {					
+					circles[i].yVel += G * timeStep; //technically a little off I hope it doesnt cause any issues
+					circles[i].y += circles[i].yVel;
 			}
-			if (circles[i].y + RADIUS < HEIGHT) {
-				circles[i].yVel += G * (1.0 / 60); //technically a little off I hope it doesnt cause any issues
-				circles[i].y += circles[i].yVel;
-			}
-			if (circles[i].y + RADIUS > HEIGHT) { //adjust height
+			if (circles[i].y + RADIUS >= HEIGHT) { //adjust height
 				circles[i].y = HEIGHT - RADIUS;
-				circles[i].yVel *= -1.0 * dampening;
-			}
-			
+				circles[i].yVel *= -dampening;
+				//cout << circles[0].yVel << endl;
+				if (fabs(circles[i].yVel) < 1) {
+					//cout << "0 velocity" << endl;
+					circles[i].yVel = 0.0;
+				}
+			}	
 		}
+		initTime = glfwGetTime();
+
+		frames = 0;
 	}
 }
 
@@ -195,6 +203,8 @@ void BeginSim() {
 	Boundry boundry(5, 5);//actually make the length and width do something cuz rn it does nothing
 	boundry.createBoundry();
 
+	//TODO: make a mesh instead the size of the circles doesnt change with the 
+	// size of the window
 	//generate circles
 	vector<Circle> circles;
 	int n = (SEGMENTS * 3) + 3;
@@ -226,6 +236,7 @@ void BeginSim() {
 	proj = glm::ortho(0.0f, (float)WIDTH, (float)HEIGHT, 0.0f, -1.0f, 1.0f);
 	
 	initTime = glfwGetTime();
+	initTime2 = glfwGetTime();
 	while (!glfwWindowShouldClose(window)) {
 		processInput(window);
 		shader.useShader();
@@ -248,6 +259,30 @@ void BeginSim() {
 
 			glfwSwapBuffers(window);
 			Update(circles);
+
+			// distance check
+			//TODO: prob put this in utils file or smth
+			for (int i = 0; i < NUM_CIRCLES; i++) {
+				for (int j = 0; j < NUM_CIRCLES; j++) {
+					if (j != i) {
+						if (fabs(circles[i].y - circles[j].y) < RADIUS*2 && fabs(circles[i].x - circles[j].x) < RADIUS*2) {
+								circles[i].y += (circles[i].y - circles[j].y + RADIUS);
+							
+							c++;
+							cout << "collision detected " << c << endl;
+							
+							circles[i].yVel *= -dampening;
+							cout << circles[i].yVel << endl;
+							if (fabs(circles[i].yVel) < 1) {
+								
+								circles[i].yVel = 0.0;
+							}
+						}
+						
+					}
+				}
+			}
+			
 		}
 		
 	glfwPollEvents();
