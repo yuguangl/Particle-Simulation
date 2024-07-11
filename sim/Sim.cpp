@@ -20,12 +20,12 @@
 //constants
 #define PI 3.1415926535897932384626433
 #define SEGMENTS 25 // just dont go over 90 for some reason
-#define RADIUS 25 // <= 1
+#define RADIUS 15 // <= 1
 #define WIDTH 1000
 #define HEIGHT 1000
-#define NUM_CIRCLES 10
+#define NUM_CIRCLES 100
 #define TARGET_FPS 60
-#define G 10
+#define G 50
 
 //globals
 bool pause = false; //obvious
@@ -40,6 +40,7 @@ double realTime; //for testing purposes
 int frames2 = 0;
 float dampening = 0.5;
 int c = 0;
+float TIME_STEP = (1.0 / 60);
 
 
 void processInput(GLFWwindow* window) {
@@ -132,7 +133,7 @@ void MakeCircleGrid(vector<Circle>& circles) {
 	int counter = 0;
 
 	while (counter < NUM_CIRCLES) {
-		int max = (WIDTH-RADIUS) / ((RADIUS * 3));
+		int max = (WIDTH-RADIUS) / ((RADIUS * 3))/2;
 		//cout << max << endl;
 		if (i % max == 0) { //calculate the 50 to be less than the width
 			j++;
@@ -147,8 +148,10 @@ void MakeCircleGrid(vector<Circle>& circles) {
 		c.size = n;
 		c.x = RADIUS* 2 + i * RADIUS * 3;
 		c.y = RADIUS + j * RADIUS * 3;
-		c.xVel = (rand() % 10) * pow(-1, rand() % 2 + 1);
-		c.yVel = (rand() % 20);
+		c.py = c.y *0.9;
+		c.px = c.x;//rand() % c.x/2 * pow(-1, rand()* 2 % 1);
+		c.acc.x = 0;
+		c.acc.y = 0;
 		circles.push_back(c);
 		i++;
 		counter++;
@@ -170,24 +173,12 @@ void Update(vector<Circle>& circles) {
 		frames2 = 0;
 		initTime2 = glfwGetTime();
 	}
-	float timeStep = (1.0 / 60);
+	float timeStep = TIME_STEP;//(1.0 / 60);
 	if (finalTime - initTime >= timeStep) { 
 		for (int i = 0; i < NUM_CIRCLES; i++) {
-			if (circles[i].y + RADIUS <= HEIGHT && circles[i].y - RADIUS >= 0) {
-				circles[i].yVel += G * timeStep; //technically a little off I hope it doesnt cause any issues
-				
-			}
-			if (circles[i].x + RADIUS <= WIDTH && circles[i].x - RADIUS >= 0) {
-				//circles[i].xVel += G * timeStep; //technically a little off I hope it doesnt cause any issues
-				circles[i].x += circles[i].xVel;
-			}
+			//circles[i].acc.y += G;
 			for (int j = 0; j < NUM_CIRCLES; j++) {
 				if (i !=j && fabs(circles[i].y - circles[j].y) < RADIUS * 2 && fabs(circles[i].x - circles[j].x) < RADIUS * 2) {
-					cout << "collision" << endl;
-					//circles[i].xVel *= -1;//dampening;
-					//circles[j].xVel *= -1; //dampening;
-					//circles[i].yVel *= -1;// dampening;
-					//circles[j].yVel *= -1;// dampening;
 					glm::vec2 axis = { circles[i].x - circles[j].x, circles[i].y - circles[j].y };
 					float length = sqrt(axis.x * axis.x + axis.y * axis.y);
 					if (length < RADIUS * 2) {
@@ -198,50 +189,64 @@ void Update(vector<Circle>& circles) {
 						circles[i].y += norm.y;
 						circles[j].x -= norm.x;
 						circles[j].y -= norm.y;
+
+						circles[i].px -= norm.x * 0.25;
+						circles[i].py -= norm.y * 0.25;
+						circles[j].px += norm.x * 0.25;
+						circles[j].py += norm.y * 0.25;
 					}
-					
 				}
 			}
+		}
+		for (int i = 0; i < NUM_CIRCLES; i++) {
+
+			glm::vec2 displacement = { circles[i].x - circles[i].px , circles[i].y - circles[i].py };
+			circles[i].px = circles[i].x;
+			circles[i].py = circles[i].y;
+			circles[i].acc.y += G;
+			circles[i].acc.y *= timeStep; 
+			circles[i].x += displacement.x;
+			circles[i].y += displacement.y;
+			circles[i].x += circles[i].acc.x;
+			circles[i].y += circles[i].acc.y;
+			circles[i].acc.x = 0.0;
+			circles[i].acc.y = 0.0;
 		}
 
 		for (int i = 0; i < NUM_CIRCLES; i++) {
 			//TODO: replace with verlet integration
-			
+			glm::vec2 displacement = { circles[i].x - circles[i].px , circles[i].y - circles[i].py };
 			if (circles[i].y + RADIUS >= HEIGHT) { 
 				circles[i].y = HEIGHT - RADIUS;
-				circles[i].yVel *= -dampening;
-				if (fabs(circles[i].yVel) < 1) {
-					circles[i].yVel = 0.0;
-				}
-			}else if (circles[i].y - RADIUS <= 0) { 
-				circles[i].y = RADIUS; //why do I have to add 1 here;
-				circles[i].yVel *= -dampening;
-				cout << circles[i].yVel << endl;
+				circles[i].py = circles[i].y + displacement[1]; //DO I CHANGE THIS BACK TO * 0.9??
+			}
+			if (circles[i].y - RADIUS <= 0) { 
+				circles[i].y = 1 + RADIUS; //why do I have to add 1 here;
+				circles[i].py = circles[i].y + displacement[1];
 			}
 			
 			if (circles[i].x + RADIUS >= WIDTH) { 
 				circles[i].x = WIDTH - RADIUS;
-				circles[i].xVel *= -dampening;
-				if (fabs(circles[i].xVel) < 1) {
-					circles[i].xVel = 0.0;
-				}
+				circles[i].px = circles[i].x + displacement[0];
+
 			}
-			else if (circles[i].x - RADIUS <= 0) { 
+			if (circles[i].x - RADIUS <= 0) { 
 				circles[i].x = RADIUS;
-				circles[i].xVel *= -dampening;
-				if (fabs(circles[i].xVel) < 1) {
-					circles[i].xVel = 0.0;
-				}
+				circles[i].px = circles[i].x + displacement[0];
 			}
 		}
-		for (int i = 0; i < NUM_CIRCLES; i++) {
-			circles[i].y += circles[i].yVel;
-			circles[i].x += circles[i].xVel;
-		}
+		
 		initTime = glfwGetTime();
 		frames = 0;
 
 	}
+}
+
+bool withinBounds(const Circle c) {
+	if (c.x < 0 || c.x > WIDTH || c.y < 0 || c.y > HEIGHT) {
+		return false;
+	}
+	return true;
 }
 
 void BeginSim() {
@@ -288,6 +293,7 @@ void BeginSim() {
 		processInput(window);
 		shader.useShader();
 		if (!pause) {
+			Update(circles);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 			for (int i = 0; i < NUM_CIRCLES; i++) {
 				glBindVertexArray(VAO[i]);
@@ -305,11 +311,19 @@ void BeginSim() {
 			}
 			// distance check
 			//TODO: prob put this in utils file or smth
-			
-			
+			int counter = 0;
+			for (int i = 0; i < NUM_CIRCLES; i++) {
+				if (withinBounds(circles[i]) ){
+					counter++;
+				}
+			}
+			if (counter != NUM_CIRCLES) {
+				cout << "Circles: " << counter << endl;
+			}
 			
 			glfwSwapBuffers(window);
-			Update(circles);
+			
+			
 		}
 		
 	glfwPollEvents();

@@ -10,8 +10,7 @@ struct Circle {
 	int size;
 	GLfloat* vertices;
 	GLuint* EBOIndices;
-	float xVel;
-	float yVel;
+	glm::vec2 acc;
 	int px; //MAKE THESE INTO VEC2s PROBAB:
 	int py;
 	int x;
