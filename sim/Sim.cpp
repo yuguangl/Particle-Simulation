@@ -20,12 +20,12 @@
 //constants
 #define PI 3.1415926535897932384626433
 #define SEGMENTS 25 // just dont go over 90 for some reason
-#define RADIUS 10 // <= 1
+#define RADIUS 25 // <= 1
 #define WIDTH 1000
 #define HEIGHT 1000
-#define NUM_CIRCLES 200
+#define NUM_CIRCLES 10
 #define TARGET_FPS 60
-#define G 0
+#define G 10
 
 //globals
 bool pause = false; //obvious
@@ -175,7 +175,7 @@ void Update(vector<Circle>& circles) {
 		for (int i = 0; i < NUM_CIRCLES; i++) {
 			if (circles[i].y + RADIUS <= HEIGHT && circles[i].y - RADIUS >= 0) {
 				circles[i].yVel += G * timeStep; //technically a little off I hope it doesnt cause any issues
-				circles[i].y += circles[i].yVel;
+				
 			}
 			if (circles[i].x + RADIUS <= WIDTH && circles[i].x - RADIUS >= 0) {
 				//circles[i].xVel += G * timeStep; //technically a little off I hope it doesnt cause any issues
@@ -184,27 +184,22 @@ void Update(vector<Circle>& circles) {
 			for (int j = 0; j < NUM_CIRCLES; j++) {
 				if (i !=j && fabs(circles[i].y - circles[j].y) < RADIUS * 2 && fabs(circles[i].x - circles[j].x) < RADIUS * 2) {
 					cout << "collision" << endl;
-					circles[i].xVel *= -1;//dampening;
-					circles[j].xVel *= -1; //dampening;
-					circles[i].yVel *= -1;// dampening;
-					circles[j].yVel *= -1;// dampening;
-					glm::vec2 C_diff = { circles[i].x - circles[j].x,circles[i].y - circles[j].y };
-					glm::vec2 v_diff = { circles[i].xVel - circles[j].xVel,circles[i].yVel - circles[j].yVel };
-					float dotProduct = glm::dot(v_diff, C_diff);
-					float normSquared = glm::dot(C_diff, C_diff);
-					glm::vec2 correction = 2.0f * (dotProduct / normSquared) * C_diff;
-					circles[i].x -= correction.x;
-					circles[i].y -= correction.y;
-
-					C_diff = { circles[j].x - circles[i].x,circles[j].y - circles[i].y };
-					v_diff = { circles[j].xVel - circles[i].xVel,circles[j].yVel - circles[i].yVel };
-					dotProduct = glm::dot(v_diff, C_diff);
-					normSquared = glm::dot(C_diff, C_diff);
-					correction = 2.0f * (dotProduct / normSquared) * C_diff;
-					circles[j].x -= correction.x;
-					circles[j].y -= correction.y;
+					//circles[i].xVel *= -1;//dampening;
+					//circles[j].xVel *= -1; //dampening;
+					//circles[i].yVel *= -1;// dampening;
+					//circles[j].yVel *= -1;// dampening;
+					glm::vec2 axis = { circles[i].x - circles[j].x, circles[i].y - circles[j].y };
+					float length = sqrt(axis.x * axis.x + axis.y * axis.y);
+					if (length < RADIUS * 2) {
+						glm::vec2 norm = { axis.x / length, axis.y / length };
+						float delta = RADIUS * 2 - length;
+						norm = { norm.x * delta * 0.5, norm.y * delta * 0.5 };
+						circles[i].x += norm.x;
+						circles[i].y += norm.y;
+						circles[j].x -= norm.x;
+						circles[j].y -= norm.y;
+					}
 					
-										
 				}
 			}
 		}
@@ -219,8 +214,8 @@ void Update(vector<Circle>& circles) {
 					circles[i].yVel = 0.0;
 				}
 			}else if (circles[i].y - RADIUS <= 0) { 
-				circles[i].y = 1 + RADIUS; //why do I have to add 1 here;
-				circles[i].yVel *= dampening;
+				circles[i].y = RADIUS; //why do I have to add 1 here;
+				circles[i].yVel *= -dampening;
 				cout << circles[i].yVel << endl;
 			}
 			
@@ -239,8 +234,13 @@ void Update(vector<Circle>& circles) {
 				}
 			}
 		}
+		for (int i = 0; i < NUM_CIRCLES; i++) {
+			circles[i].y += circles[i].yVel;
+			circles[i].x += circles[i].xVel;
+		}
 		initTime = glfwGetTime();
 		frames = 0;
+
 	}
 }
 

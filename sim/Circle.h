@@ -12,6 +12,8 @@ struct Circle {
 	GLuint* EBOIndices;
 	float xVel;
 	float yVel;
+	int px; //MAKE THESE INTO VEC2s PROBAB:
+	int py;
 	int x;
 	int y;
 
