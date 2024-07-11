@@ -8,6 +8,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <windows.h>   // for MS Windows
 #include <time.h>
+#include <math.h>
+#include <stdio.h>
 //#include <gl/glut.h>
 
 
@@ -18,12 +20,12 @@
 //constants
 #define PI 3.1415926535897932384626433
 #define SEGMENTS 25 // just dont go over 90 for some reason
-#define RADIUS 20 // <= 1
+#define RADIUS 10 // <= 1
 #define WIDTH 1000
 #define HEIGHT 1000
-#define NUM_CIRCLES 4
+#define NUM_CIRCLES 200
 #define TARGET_FPS 60
-#define G 10
+#define G 0
 
 //globals
 bool pause = false; //obvious
@@ -38,6 +40,7 @@ double realTime; //for testing purposes
 int frames2 = 0;
 float dampening = 0.5;
 int c = 0;
+
 
 void processInput(GLFWwindow* window) {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
@@ -142,10 +145,10 @@ void MakeCircleGrid(vector<Circle>& circles) {
 		c.EBOIndices = EBOIndices;
 		c.vertices = vertices;
 		c.size = n;
-		c.x = RADIUS* 2 + j * RADIUS * 3;
-		c.y = RADIUS + i * RADIUS * 3;
-		c.xAcc = 0;
-		c.yAcc = G;
+		c.x = RADIUS* 2 + i * RADIUS * 3;
+		c.y = RADIUS + j * RADIUS * 3;
+		c.xVel = (rand() % 10) * pow(-1, rand() % 2 + 1);
+		c.yVel = (rand() % 20);
 		circles.push_back(c);
 		i++;
 		counter++;
@@ -167,27 +170,76 @@ void Update(vector<Circle>& circles) {
 		frames2 = 0;
 		initTime2 = glfwGetTime();
 	}
-	float timeStep = 0.05;//(1.0 / 60);
+	float timeStep = (1.0 / 60);
 	if (finalTime - initTime >= timeStep) { 
+		for (int i = 0; i < NUM_CIRCLES; i++) {
+			if (circles[i].y + RADIUS <= HEIGHT && circles[i].y - RADIUS >= 0) {
+				circles[i].yVel += G * timeStep; //technically a little off I hope it doesnt cause any issues
+				circles[i].y += circles[i].yVel;
+			}
+			if (circles[i].x + RADIUS <= WIDTH && circles[i].x - RADIUS >= 0) {
+				//circles[i].xVel += G * timeStep; //technically a little off I hope it doesnt cause any issues
+				circles[i].x += circles[i].xVel;
+			}
+			for (int j = 0; j < NUM_CIRCLES; j++) {
+				if (i !=j && fabs(circles[i].y - circles[j].y) < RADIUS * 2 && fabs(circles[i].x - circles[j].x) < RADIUS * 2) {
+					cout << "collision" << endl;
+					circles[i].xVel *= -1;//dampening;
+					circles[j].xVel *= -1; //dampening;
+					circles[i].yVel *= -1;// dampening;
+					circles[j].yVel *= -1;// dampening;
+					glm::vec2 C_diff = { circles[i].x - circles[j].x,circles[i].y - circles[j].y };
+					glm::vec2 v_diff = { circles[i].xVel - circles[j].xVel,circles[i].yVel - circles[j].yVel };
+					float dotProduct = glm::dot(v_diff, C_diff);
+					float normSquared = glm::dot(C_diff, C_diff);
+					glm::vec2 correction = 2.0f * (dotProduct / normSquared) * C_diff;
+					circles[i].x -= correction.x;
+					circles[i].y -= correction.y;
+
+					C_diff = { circles[j].x - circles[i].x,circles[j].y - circles[i].y };
+					v_diff = { circles[j].xVel - circles[i].xVel,circles[j].yVel - circles[i].yVel };
+					dotProduct = glm::dot(v_diff, C_diff);
+					normSquared = glm::dot(C_diff, C_diff);
+					correction = 2.0f * (dotProduct / normSquared) * C_diff;
+					circles[j].x -= correction.x;
+					circles[j].y -= correction.y;
+					
+										
+				}
+			}
+		}
 
 		for (int i = 0; i < NUM_CIRCLES; i++) {
 			//TODO: replace with verlet integration
-			if (circles[i].y + RADIUS <= HEIGHT) {					
-					circles[i].yVel += G * timeStep; //technically a little off I hope it doesnt cause any issues
-					circles[i].y += circles[i].yVel;
-			}
-			if (circles[i].y + RADIUS >= HEIGHT) { //adjust height
+			
+			if (circles[i].y + RADIUS >= HEIGHT) { 
 				circles[i].y = HEIGHT - RADIUS;
 				circles[i].yVel *= -dampening;
-				//cout << circles[0].yVel << endl;
 				if (fabs(circles[i].yVel) < 1) {
-					//cout << "0 velocity" << endl;
 					circles[i].yVel = 0.0;
 				}
-			}	
+			}else if (circles[i].y - RADIUS <= 0) { 
+				circles[i].y = 1 + RADIUS; //why do I have to add 1 here;
+				circles[i].yVel *= dampening;
+				cout << circles[i].yVel << endl;
+			}
+			
+			if (circles[i].x + RADIUS >= WIDTH) { 
+				circles[i].x = WIDTH - RADIUS;
+				circles[i].xVel *= -dampening;
+				if (fabs(circles[i].xVel) < 1) {
+					circles[i].xVel = 0.0;
+				}
+			}
+			else if (circles[i].x - RADIUS <= 0) { 
+				circles[i].x = RADIUS;
+				circles[i].xVel *= -dampening;
+				if (fabs(circles[i].xVel) < 1) {
+					circles[i].xVel = 0.0;
+				}
+			}
 		}
 		initTime = glfwGetTime();
-
 		frames = 0;
 	}
 }
@@ -210,14 +262,11 @@ void BeginSim() {
 	int n = (SEGMENTS * 3) + 3;
 	MakeCircleGrid(circles);
 	
-	
-	
 	Shader shader("VertexShader", "FragmentShader");
 	Shader boundryShader("VertexShader", "FragmentShader");
 	
 	glfwSwapBuffers(window);
 
-	
 	GLuint* VAO = new GLuint[NUM_CIRCLES];
 	GLuint* VBO = new GLuint[NUM_CIRCLES];
 	GLuint* EBO = new GLuint[NUM_CIRCLES];
@@ -226,9 +275,7 @@ void BeginSim() {
 		GLuint* buffers = CreateBuffers(circles[i].vertices, circles[i].EBOIndices, n);
 		VAO[i] = buffers[0], VBO[i] = buffers[1], EBO[i] = buffers[2];
 	}
-
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
 	int modelLoc = glGetUniformLocation(shader.shaderID, "model");
 	int projLoc = glGetUniformLocation(shader.shaderID, "proj");
 
@@ -256,33 +303,13 @@ void BeginSim() {
 
 				glDrawElements(GL_TRIANGLES, n, GL_UNSIGNED_INT, 0);
 			}
-
-			glfwSwapBuffers(window);
-			Update(circles);
-
 			// distance check
 			//TODO: prob put this in utils file or smth
-			for (int i = 0; i < NUM_CIRCLES; i++) {
-				for (int j = 0; j < NUM_CIRCLES; j++) {
-					if (j != i) {
-						if (fabs(circles[i].y - circles[j].y) < RADIUS*2 && fabs(circles[i].x - circles[j].x) < RADIUS*2) {
-								circles[i].y += (circles[i].y - circles[j].y + RADIUS);
-							
-							c++;
-							cout << "collision detected " << c << endl;
-							
-							circles[i].yVel *= -dampening;
-							cout << circles[i].yVel << endl;
-							if (fabs(circles[i].yVel) < 1) {
-								
-								circles[i].yVel = 0.0;
-							}
-						}
-						
-					}
-				}
-			}
 			
+			
+			
+			glfwSwapBuffers(window);
+			Update(circles);
 		}
 		
 	glfwPollEvents();
@@ -294,14 +321,12 @@ void BeginSim() {
 		glDeleteBuffers(1, &VBO[i]);
 		glDeleteBuffers(1, &EBO[i]);
 	}
-	
 	shader.Delete();
 	glfwDestroyWindow(window);
 	for (int i = 0; i < NUM_CIRCLES; i++) {
 		delete[] circles[i].EBOIndices;
 		delete[] circles[i].vertices;
 	}
-	
 	glfwTerminate();
 	return;
 }
@@ -313,7 +338,6 @@ int main() {
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	prevTime = glfwGetTime();
-	
 	BeginSim();
 	return 0;
 }
