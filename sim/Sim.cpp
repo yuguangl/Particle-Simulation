@@ -33,8 +33,6 @@ int frames2 = 0;
 float dampening = 0.5;
 int c = 0;
 
-
-
 bool processInput(GLFWwindow* window, const vector<Particle> particles) {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
 		glfwSetWindowShouldClose(window, true);
@@ -70,15 +68,15 @@ bool processInput(GLFWwindow* window, const vector<Particle> particles) {
 	}
 }
 
-void particleInvariantCheck(const vector<Particle> &particles){
+void particleInvariantCheck(const vector<Particle> particles){
 	int counter = 0;
 	for (int i = 0; i < NUM_CIRCLES; i++) {
-		if (particles[i].curr.x < 0 || particles[i].curr.x > WIDTH || particles[i].curr.y < 0 || particles[i].curr.y > HEIGHT) {
+		if (particles[i].curr.x != particles[i].curr.x ||particles[i].curr.x < 0 || particles[i].curr.x > WIDTH || particles[i].curr.y < 0 || particles[i].curr.y > HEIGHT) {
 			counter++;
 		}
 	}
-	if (counter < 0) {
-		cout << "Particles: " << counter << endl;
+	if (counter > 0) {
+		cout << "Particles Lost: " << counter << endl;
 	}
 }
 
@@ -122,7 +120,7 @@ void updatePositions(vector<Particle>& particles) {
 	for (int i = 0; i < NUM_CIRCLES; i++) {
 		glm::vec2 displacement = { particles[i].curr.x - particles[i].prev.x , particles[i].curr.y - particles[i].prev.y };
 		particles[i].prev = particles[i].curr;
-		particles[i].acc.y *= TIME_STEP;
+		particles[i].acc.y *= TIME_STEP * 0.5;
 		particles[i].curr += displacement + particles[i].acc;
 		particles[i].acc = {0,0};
 	}
@@ -154,15 +152,12 @@ void checkBounds(vector<Particle> &particles) {
 }
 
 void Update(vector<Particle>& particles, GLFWwindow* window) {
-	frames++;
-	frames2++;
-	finalTime = glfwGetTime();
-	finalTime2 = glfwGetTime();
 	//check fps
 	if (finalTime2 - initTime2 >= 1.0) {
 		int fps = frames2 / (finalTime2 - initTime2);
 		string f = "FPS: " + to_string(fps);
 		const char* str_fps = (f).c_str();
+		// I dont think this is correct
 		glfwSetWindowTitle(window, str_fps);
 
 		//check particles lost
@@ -171,7 +166,7 @@ void Update(vector<Particle>& particles, GLFWwindow* window) {
 		frames2 = 0;
 		initTime2 = glfwGetTime();
 	}
-	if (finalTime - initTime >= TIME_STEP) { 
+	if (finalTime - initTime >= TIME_STEP/8) { 
 		applyG(particles);
 		collisionCheck(particles);
 		updatePositions(particles);
@@ -182,8 +177,6 @@ void Update(vector<Particle>& particles, GLFWwindow* window) {
 	
 
 }
-
-
 
 void BeginSim() {
 	//create window
@@ -247,9 +240,13 @@ void BeginSim() {
 			
 			glfwSwapBuffers(window);
 			if (nextFrame) {
-				//for (int i = 0; i < 2; i++) {
+				frames++;
+				frames2++;
+				for (int i = 0; i < 8; i++) {
+					finalTime = glfwGetTime();
+					finalTime2 = glfwGetTime();
 					Update(particles, window);
-				//}
+				}
 			}
 		}
 		
@@ -258,6 +255,8 @@ void BeginSim() {
 	}
 
 	//TODO: RUN VALGRIND
+	//TODO: change color with velocity
+	//TODO: chemical reactions and stuff
 	for (int i = 0; i < NUM_CIRCLES; i++) {
 		glDeleteVertexArrays(1, &VAO[i]);
 		glDeleteBuffers(1, &VBO[i]);
