@@ -144,7 +144,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Boundry.h" />
-    <ClInclude Include="Circle.h" />
+    <ClInclude Include="Particle.h" />
+    <ClInclude Include="Constants.h" />
     <ClInclude Include="Shader.h" />
   </ItemGroup>
   <ItemGroup>

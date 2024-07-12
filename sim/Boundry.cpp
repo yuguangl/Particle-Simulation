@@ -3,6 +3,7 @@
 Boundry::Boundry(float width, float height) {
 	this->width = width;
 	this->height = height;
+
 }
 
 void Boundry::createBoundry() {
