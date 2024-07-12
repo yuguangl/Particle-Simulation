@@ -20,12 +20,12 @@
 //constants
 #define PI 3.1415926535897932384626433
 #define SEGMENTS 25 // just dont go over 90 for some reason
-#define RADIUS 15 // <= 1
+#define RADIUS 30 // <= 1
 #define WIDTH 1000
 #define HEIGHT 1000
-#define NUM_CIRCLES 100
+#define NUM_CIRCLES 20
 #define TARGET_FPS 60
-#define G 50
+#define G 100
 
 //globals
 bool pause = false; //obvious
@@ -43,22 +43,42 @@ int c = 0;
 float TIME_STEP = (1.0 / 60);
 
 
-void processInput(GLFWwindow* window) {
+bool processInput(GLFWwindow* window, const vector<Circle> circles) {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
 		glfwSetWindowShouldClose(window, true);
 	}
 	else if (GetAsyncKeyState(' ') && glfwGetTime() - prevTime > 0.2) {
-			
+			for (int i = 0; i < NUM_CIRCLES; i++) {
+				cout << "circle[" << i << "]: (" << circles[i].x << ", " << circles[i].y << ")" << endl;
+			}
 			prevTime = glfwGetTime();
 			if (!pause) {
 				timeOffset = glfwGetTime();
+				
 			}
 			else {
 				glfwSetTime(timeOffset);
 			}
 			pause = !pause;
 	}
+	if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS && glfwGetTime() - prevTime > 0.1) {
+		prevTime = glfwGetTime();
+		if (!pause) {
+			timeOffset = glfwGetTime();
+
+		}
+		else {
+			glfwSetTime(timeOffset);
+		}
+		pause = !pause;
+		return true;
+	}
+	else {
+		return true;
+	}
 }
+
+
 void framebuffer_size_callback(GLFWwindow* window, int w, int h) {
 	glViewport(0, 0, w, h);
 }
@@ -133,7 +153,7 @@ void MakeCircleGrid(vector<Circle>& circles) {
 	int counter = 0;
 
 	while (counter < NUM_CIRCLES) {
-		int max = (WIDTH-RADIUS) / ((RADIUS * 3))/2;
+		int max = (WIDTH-RADIUS-200) / ((RADIUS * 3));
 		//cout << max << endl;
 		if (i % max == 0) { //calculate the 50 to be less than the width
 			j++;
@@ -146,102 +166,21 @@ void MakeCircleGrid(vector<Circle>& circles) {
 		c.EBOIndices = EBOIndices;
 		c.vertices = vertices;
 		c.size = n;
-		c.x = RADIUS* 2 + i * RADIUS * 3;
-		c.y = RADIUS + j * RADIUS * 3;
+		
+		c.x = 100 + RADIUS* 2 + i * RADIUS * 3;
+		c.y = 100 + RADIUS + j * RADIUS * 3;
+		c.xVel = rand() % 10 * pow(-1, rand() * 2 % 1);
+		c.yVel = rand() % 10 * pow(-1, rand() * 2 % 1);
 		c.py = c.y *0.9;
-		c.px = c.x;//rand() % c.x/2 * pow(-1, rand()* 2 % 1);
-		c.acc.x = 0;
+		c.px = -10 + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (c.x - c.x-10))) * pow(-1, rand()* 2 % 1);
+		c.acc.x = 0xb;
 		c.acc.y = 0;
 		circles.push_back(c);
 		i++;
 		counter++;
 	}
+
 }
-
-void Update(vector<Circle>& circles) {
-	frames++;
-	frames2++;
-	finalTime = glfwGetTime();
-	finalTime2 = glfwGetTime();
-	//TODO: make something that prints to the screen instead of cout
-	//handle collisions and stuff
-	if (finalTime2 - initTime2 >= 1.0) {
-		int fps = frames2 / (finalTime2 - initTime2);
-		if (fps < TARGET_FPS) {
-			cout << "LOW FRAME RATE DETECTED: " << fps << endl;
-		}
-		frames2 = 0;
-		initTime2 = glfwGetTime();
-	}
-	float timeStep = TIME_STEP;//(1.0 / 60);
-	if (finalTime - initTime >= timeStep) { 
-		for (int i = 0; i < NUM_CIRCLES; i++) {
-			//circles[i].acc.y += G;
-			for (int j = 0; j < NUM_CIRCLES; j++) {
-				if (i !=j && fabs(circles[i].y - circles[j].y) < RADIUS * 2 && fabs(circles[i].x - circles[j].x) < RADIUS * 2) {
-					glm::vec2 axis = { circles[i].x - circles[j].x, circles[i].y - circles[j].y };
-					float length = sqrt(axis.x * axis.x + axis.y * axis.y);
-					if (length < RADIUS * 2) {
-						glm::vec2 norm = { axis.x / length, axis.y / length };
-						float delta = RADIUS * 2 - length;
-						norm = { norm.x * delta * 0.5, norm.y * delta * 0.5 };
-						circles[i].x += norm.x;
-						circles[i].y += norm.y;
-						circles[j].x -= norm.x;
-						circles[j].y -= norm.y;
-
-						circles[i].px -= norm.x * 0.25;
-						circles[i].py -= norm.y * 0.25;
-						circles[j].px += norm.x * 0.25;
-						circles[j].py += norm.y * 0.25;
-					}
-				}
-			}
-		}
-		for (int i = 0; i < NUM_CIRCLES; i++) {
-
-			glm::vec2 displacement = { circles[i].x - circles[i].px , circles[i].y - circles[i].py };
-			circles[i].px = circles[i].x;
-			circles[i].py = circles[i].y;
-			circles[i].acc.y += G;
-			circles[i].acc.y *= timeStep; 
-			circles[i].x += displacement.x;
-			circles[i].y += displacement.y;
-			circles[i].x += circles[i].acc.x;
-			circles[i].y += circles[i].acc.y;
-			circles[i].acc.x = 0.0;
-			circles[i].acc.y = 0.0;
-		}
-
-		for (int i = 0; i < NUM_CIRCLES; i++) {
-			//TODO: replace with verlet integration
-			glm::vec2 displacement = { circles[i].x - circles[i].px , circles[i].y - circles[i].py };
-			if (circles[i].y + RADIUS >= HEIGHT) { 
-				circles[i].y = HEIGHT - RADIUS;
-				circles[i].py = circles[i].y + displacement[1]; //DO I CHANGE THIS BACK TO * 0.9??
-			}
-			if (circles[i].y - RADIUS <= 0) { 
-				circles[i].y = 1 + RADIUS; //why do I have to add 1 here;
-				circles[i].py = circles[i].y + displacement[1];
-			}
-			
-			if (circles[i].x + RADIUS >= WIDTH) { 
-				circles[i].x = WIDTH - RADIUS;
-				circles[i].px = circles[i].x + displacement[0];
-
-			}
-			if (circles[i].x - RADIUS <= 0) { 
-				circles[i].x = RADIUS;
-				circles[i].px = circles[i].x + displacement[0];
-			}
-		}
-		
-		initTime = glfwGetTime();
-		frames = 0;
-
-	}
-}
-
 bool withinBounds(const Circle c) {
 	if (c.x < 0 || c.x > WIDTH || c.y < 0 || c.y > HEIGHT) {
 		return false;
@@ -249,9 +188,168 @@ bool withinBounds(const Circle c) {
 	return true;
 }
 
+void Update(vector<Circle>& circles, GLFWwindow* window) {
+	frames++;
+	frames2++;
+	finalTime = glfwGetTime();
+	finalTime2 = glfwGetTime();
+	if (finalTime2 - initTime2 >= 1.0) {
+		int fps = frames2 / (finalTime2 - initTime2);
+		string f = "FPS: " + to_string(fps);
+		const char* str_fps = (f).c_str();
+		glfwSetWindowTitle(window, str_fps);
+		if (fps < TARGET_FPS) {
+			cout << "LOW FRAME RATE DETECTED: " << fps << endl;
+		}
+
+		int counter = 0;
+		for (int i = 0; i < NUM_CIRCLES; i++) {
+			if (withinBounds(circles[i])) {
+				counter++;
+			}
+		}
+		if (counter != NUM_CIRCLES) {
+			cout << "Circles: " << counter << endl;
+		}
+
+		frames2 = 0;
+		initTime2 = glfwGetTime();
+	}
+	GLfloat timeStep = TIME_STEP;
+	if (finalTime - initTime >= timeStep) { 
+		for (int i = 0; i < NUM_CIRCLES; i++) {
+			circles[i].acc.y = G;
+			for (int j = 0; j < NUM_CIRCLES; j++) {
+				glm::vec2 axis = { circles[i].x - circles[j].x, circles[i].y - circles[j].y };
+				GLfloat length = sqrt(axis.x * axis.x + axis.y * axis.y);
+				glm::vec2 norm;
+				if (i !=j) {
+					if (length < RADIUS * 2) {
+						norm = { axis.x / length, axis.y / length };
+						GLfloat delta = RADIUS  * 2 - length;
+						norm = { norm.x * delta * 0.5, norm.y * delta * 0.5 };
+						if (length == 0) {
+							int angle = rand() % 361;
+							norm.x = cos(angle) * RADIUS ;
+							norm.y = sin(angle) * RADIUS ;
+						}
+						
+						circles[i].x += norm.x ;
+						circles[j].x -= norm.x ;
+						circles[i].y += norm.y ;
+						circles[j].y -= norm.y ;
+						//circles[j].acc -= 1;
+						//circles[i].acc.x += 1;
+						/*circles[i].yVel *= dampening;
+						circles[j].yVel *= dampening;*/
+
+						//check bounds  and collision directions
+						//if (circles[i].x <= RADIUS) {
+						//	circles[j].x -= 2 * norm.x;
+						//	//circles[j].x -= 2 * norm.x;
+						//	//circles[j].px = circles[j].x - 10;
+						//}
+						//else if (circles[i].x >= WIDTH - RADIUS) {
+						//	circles[j].x -= 2 * norm.x;
+						//	//circles[j].x -= 2 * norm.x;
+						//	//circles[j].px = circles[j].x + 20;
+						//}
+						//else if (circles[j].x <= RADIUS) {
+						//	circles[i].x += 2* norm.x;
+						//	//circles[i].px += 2 * norm.x;
+						//	//circles[i].px = circles[i].x - 10;
+						//}
+						//else if (circles[j].x >= WIDTH - RADIUS) {
+						//	circles[i].x += 2 * norm.x;
+						//	//circles[i].px += 2 * norm.x;
+						//	//circles[i].px = circles[i].x + 20;
+						//}
+						//else {//no walls
+						//	circles[i].x += norm.x;
+						//	circles[j].x -= norm.x;
+						//	//circles[j].px = circles[j].x;
+						//	//circles[i].px = circles[i].x;
+						//	
+						//}
+						//
+						//if (circles[i].y <= RADIUS || circles[i].y >= HEIGHT - RADIUS) {
+						//	circles[j].y -= 2 * norm.y;
+						//	//circles[j].py -= 2 * norm.y;
+						//	//circles[j].py = circles[j].y;
+						//}
+						//else if (circles[j].y <= RADIUS || circles[j].y >= HEIGHT - RADIUS) {
+						//	circles[i].y += 2 * norm.y;
+						//	//circles[i].py += 2 * norm.y;
+						//	//circles[i].py = circles[i].y;
+						//}
+						//else {
+						//	circles[i].y += norm.y;
+						//	circles[j].y -= norm.y;
+						//	//circles[i].py = circles[i].y;
+						//	//circles[j].py = circles[j].y;
+						//}
+					}
+				}
+			}
+		}
+
+		for (int i = 0; i < NUM_CIRCLES; i++) {
+			glm::vec2 displacement = {circles[i].x - circles[i].px , circles[i].y - circles[i].py };
+			circles[i].px = circles[i].x;
+			circles[i].py = circles[i].y;
+			
+			circles[i].acc.y *= timeStep;
+			circles[i].x += displacement.x;
+			circles[i].y += displacement.y;
+			circles[i].x += circles[i].acc.x;
+			circles[i].y += circles[i].acc.y;
+			circles[i].acc.x = 0.0;
+			circles[i].acc.y = 0.0;
+		}
+		
+
+		initTime = glfwGetTime();
+		frames = 0;
+
+	}
+	for (int i = 0; i < NUM_CIRCLES; i++) {
+		//TODO: replace with verlet integration
+		glm::vec2 displacement;
+		if (circles[i].y + RADIUS >= HEIGHT) {
+			displacement = { circles[i].x - circles[i].px , circles[i].y - circles[i].py };
+			circles[i].y = HEIGHT - RADIUS;
+			//circles[i].py = (circles[i].y + displacement[1] * dampening); //DO I CHANGE THIS BACK TO * 0.9??
+			//circles[i].yVel *= -dampening;
+		}
+		if (circles[i].y - RADIUS <= 0) {
+			displacement = { circles[i].x - circles[i].px , circles[i].y - circles[i].py };
+			circles[i].y = 1 + RADIUS; //why do I have to add 1 here;
+			//circles[i].py = circles[i].y + displacement[1] * dampening;
+			//circles[i].yVel *= -dampening;
+		}
+
+		if (circles[i].x + RADIUS >= WIDTH) {
+			displacement = { circles[i].x - circles[i].px , circles[i].y - circles[i].py };
+			circles[i].x = WIDTH - RADIUS;
+			//circles[i].px = circles[i].x + displacement[0] * dampening;
+			//circles[i].xVel *= -dampening;
+
+		}
+		if (circles[i].x - RADIUS <= 0) {
+			displacement = { circles[i].x - circles[i].px , circles[i].y - circles[i].py };
+			circles[i].x = RADIUS;
+			//circles[i].px = circles[i].x + displacement[0] * dampening;
+			//circles[i].xVel *= -dampening;
+		}
+	}
+}
+
+
+
 void BeginSim() {
 	//create window
-	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Circle", NULL, NULL);
+	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Starting Simulation...", NULL, NULL);
+	
 	glfwMakeContextCurrent(window);
 	gladLoadGL();
 	glViewport(0, 0, WIDTH, HEIGHT);
@@ -290,10 +388,11 @@ void BeginSim() {
 	initTime = glfwGetTime();
 	initTime2 = glfwGetTime();
 	while (!glfwWindowShouldClose(window)) {
-		processInput(window);
+		bool nextFrame = processInput(window, circles);
 		shader.useShader();
 		if (!pause) {
-			Update(circles);
+			
+			
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 			for (int i = 0; i < NUM_CIRCLES; i++) {
 				glBindVertexArray(VAO[i]);
@@ -311,20 +410,21 @@ void BeginSim() {
 			}
 			// distance check
 			//TODO: prob put this in utils file or smth
-			int counter = 0;
-			for (int i = 0; i < NUM_CIRCLES; i++) {
-				if (withinBounds(circles[i]) ){
-					counter++;
-				}
-			}
-			if (counter != NUM_CIRCLES) {
-				cout << "Circles: " << counter << endl;
-			}
+
+			
+			
 			
 			glfwSwapBuffers(window);
+			if (nextFrame) {
+				for (int i = 0; i < 2; i++) {
+					Update(circles, window);
+				}
+
+			}
 			
 			
 		}
+		
 		
 	glfwPollEvents();
 	}
@@ -347,6 +447,7 @@ void BeginSim() {
 
 int main() {
 	//Initialization
+	srand(static_cast <unsigned> (time(0)));
 	glfwInit();
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
