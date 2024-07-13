@@ -14,7 +14,7 @@ using namespace std;
 #define WIDTH 1000
 #define HEIGHT 1000
 #define TARGET_FPS 60
-#define G 150
+#define G 200
 #define TIME_STEP (1.0f / 70.0f)
 #define NUM_SUBSTEPS 1
 #define SUBSTEP TIME_STEP/NUM_SUBSTEPS
@@ -25,7 +25,7 @@ using namespace std;
 
 
 //globals
-int NUM_CIRCLES = 100;
+int NUM_CIRCLES = 1000;
 bool pause = false; //obvious
 double prevTime = 0; // used to make sure button presses work properly
 double timeOffset = 0;//used to offset time after pause
