@@ -57,9 +57,8 @@ void MakeParticleGrid(vector<Particle>& particles) {
 	int counter = 0;
 
 	while (counter < NUM_CIRCLES) {
-		int max = (WIDTH - RADIUS - 200) / ((RADIUS * 3));
-		//cout << max << endl;
-		if (i % max == 0) { //calculate the 50 to be less than the width
+		int max = (WIDTH - RADIUS) / ((RADIUS * 2.5));
+		if (i % max == 0) {
 			j++;
 			i = 0;
 		}
@@ -70,11 +69,10 @@ void MakeParticleGrid(vector<Particle>& particles) {
 		c.EBOIndices = EBOIndices;
 		c.vertices = vertices;
 		c.size = n;
-
-		c.curr.x = 100 + RADIUS * 2 + i * RADIUS * 3;
-		c.curr.y = RADIUS + j * RADIUS * 3;
+		c.curr.x = RADIUS * 2 + i * RADIUS * 2.5;
+		c.curr.y = RADIUS + j * RADIUS * 2.5;
 		c.prev.y = c.curr.y * 0.9;
-		c.prev.x = c.curr.x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (20)))* pow(-1, rand() % 3 + 1);
+		c.prev.x = c.curr.x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (5)))* pow(-1, rand() % 3 + 1);
 		c.acc.x = 0;
 		c.acc.y = 0;
 		particles.push_back(c);
@@ -101,7 +99,7 @@ GLuint* CreateBuffers(GLfloat*& vertices, GLuint*& EBOIndices, int n) {
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, n * sizeof(GLuint), EBOIndices, GL_STATIC_DRAW);
-	glClearColor(0.5f, 0.8f, 1.0f, 1.0f);
+	glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	buffers[0] = VAO;
