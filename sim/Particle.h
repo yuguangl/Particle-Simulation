@@ -1,9 +1,12 @@
 #pragma once
+#ifndef PARTICLE_H
+#define PARTICLE_H
 #include <iostream>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <vector>
 #include <cmath>
+#include "Variables.h"
 using namespace std;
 
 struct Particle {
@@ -58,8 +61,7 @@ void MakeParticleGrid(vector<Particle>& particles) {
 
 	while (counter < NUM_CIRCLES) {
 		int max = (WIDTH - RADIUS - 200) / ((RADIUS * 3));
-		//cout << max << endl;
-		if (i % max == 0) { //calculate the 50 to be less than the width
+		if (i % max == 0) {
 			j++;
 			i = 0;
 		}
@@ -70,13 +72,11 @@ void MakeParticleGrid(vector<Particle>& particles) {
 		c.EBOIndices = EBOIndices;
 		c.vertices = vertices;
 		c.size = n;
-
-		c.curr.x = 100 + RADIUS * 2 + i * RADIUS * 3;
+		c.curr.x = 100 + RADIUS * 2 + i * RADIUS * 2;
 		c.curr.y = RADIUS + j * RADIUS * 3;
 		c.prev.y = c.curr.y * 0.9;
-		c.prev.x = c.curr.x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (20)))* pow(-1, rand() % 3 + 1);
-		c.acc.x = 0;
-		c.acc.y = 0;
+		c.prev.x = c.curr.x + (static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (5))) * pow(-1, rand() % 3 + 1));
+		c.acc = {};
 		particles.push_back(c);
 		i++;
 		counter++;
@@ -101,7 +101,7 @@ GLuint* CreateBuffers(GLfloat*& vertices, GLuint*& EBOIndices, int n) {
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, n * sizeof(GLuint), EBOIndices, GL_STATIC_DRAW);
-	glClearColor(0.5f, 0.8f, 1.0f, 1.0f);
+	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	buffers[0] = VAO;
@@ -109,3 +109,25 @@ GLuint* CreateBuffers(GLfloat*& vertices, GLuint*& EBOIndices, int n) {
 	buffers[2] = EBO;
 	return buffers;
 }
+
+void addParticle(vector<Particle>& particles, const double xpos, const double ypos) {
+	int n = particles[0].size;
+	Particle c;
+	GLfloat* vertices = new GLfloat[n];
+	GLuint* EBOIndices = new GLuint[n];
+	GenerateParticle(vertices, EBOIndices, n);
+	c.EBOIndices = EBOIndices;
+	c.vertices = vertices;
+	c.size = n;
+	c.curr.x = xpos;
+	c.curr.y = ypos;
+	c.prev.y = c.curr.y * 0.99;
+	c.prev.x = (c.curr.x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (10))) * pow(-1, rand() % 3 + 1))/NUM_SUBSTEPS;
+	c.acc = {};
+	int size_ = particles.size() + 1;
+	//particles.resize(size_);
+	particles.push_back(c);
+	//cout << particles.size() << endl;
+	//NUM_CIRCLES++;
+}
+#endif
