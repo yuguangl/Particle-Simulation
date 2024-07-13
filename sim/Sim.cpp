@@ -18,6 +18,8 @@
 #include "Boundry.h"
 
 
+
+
 bool processInput(GLFWwindow* window, const vector<Particle> particles) {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
 		glfwSetWindowShouldClose(window, true);
@@ -67,9 +69,22 @@ void particleInvariantCheck(const vector<Particle> particles) {
 
 
 
-void applyG(vector<Particle>& particles) {
+void applyForces(vector<Particle>& particles) {
 	for (int i = 0; i < NUM_CIRCLES; i++) {
 		particles[i].acc.y = G / (float)NUM_SUBSTEPS;
+		//densities[i] = CalculateDensity(particles, i);
+		
+		//TODO: HELPER FUNCTION THAT DETECTS WHERE SCREEN CLICK AND FIND THE PARTICLE AT THAT POINT
+	}
+	for (int i = 0; i < NUM_CIRCLES; i++) {
+		//vec2 force = CalculateForce(particles, i);
+		
+		if (densities[i] != 0) {
+			//particles[i].acc += force / densities[i];
+			
+		}
+		
+		
 	}
 }
 
@@ -80,6 +95,8 @@ void collisionCheck(vector<Particle>& particles) {
 			GLfloat dist = sqrt(axis.x * axis.x + axis.y * axis.y);
 			glm::vec2 norm;
 			if (i != j) {
+				//TODO: I THINK I NEED TO FIX THIS FOR MASS CALCULATIONS
+				//TODO: AND RADIUS CALCULATIONS
 				if (dist < RADIUS * 2) {
 					norm = { axis.x / dist, axis.y / dist };
 					GLfloat delta = (RADIUS * 2) - dist;
@@ -106,9 +123,10 @@ void updatePositions(vector<Particle>& particles) {
 	for (int i = 0; i < NUM_CIRCLES; i++) {
 		glm::vec2 displacement = particles[i].curr - particles[i].prev;
 		particles[i].prev = particles[i].curr;
-		particles[i].acc.y *= TIME_STEP * TIME_STEP;
+		particles[i].acc *= TIME_STEP * TIME_STEP;
+		//cout << particles[i].acc.x << endl;
 		particles[i].curr += displacement + particles[i].acc;
-		particles[i].acc = { 0,0 };
+		particles[i].acc = {};
 	}
 }
 
@@ -155,7 +173,7 @@ void Update(vector<Particle>& particles, GLFWwindow* window) {
 		
 		
 		for (int i = 0; i < NUM_SUBSTEPS; i++) {
-			applyG(particles);
+			applyForces(particles);
 			collisionCheck(particles);
 			//checkBounds(particles);
 			updatePositions(particles);
@@ -210,6 +228,11 @@ void BeginSim() {
 
 	initTime = glfwGetTime();
 	initTime2 = glfwGetTime();
+
+	for (int i = 0; i < NUM_CIRCLES; i++) {
+		densities.push_back(0.0f);
+	}
+
 	while (!glfwWindowShouldClose(window)) {
 		bool nextFrame = processInput(window, particles);
 		shader.useShader();
@@ -265,7 +288,7 @@ void BeginSim() {
 
 int main() {
 	//Initialization
-	srand(static_cast <unsigned> (time(0)));
+	//srand(static_cast <unsigned> (time(0)));
 	glfwInit();
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);

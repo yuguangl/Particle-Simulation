@@ -4,16 +4,91 @@
 #include <GLFW/glfw3.h>
 #include <vector>
 #include <cmath>
+#include "Variables.h"
+#include "Utils.h"
 using namespace std;
+using namespace glm;
+
+
+
 
 struct Particle {
 	int size;
 	GLfloat* vertices;
 	GLuint* EBOIndices;
-	glm::vec2 acc;
-	glm::vec2 prev;
-	glm::vec2 curr;
+	vec2 acc;
+	vec2 prev;
+	vec2 curr;
 };
+
+
+
+float SmoothingKernel(float dist) {
+	
+	float volume = PI * pow(SMOOTHING_RADIUS, 4) / 6.0f;
+	if (0 > SMOOTHING_RADIUS - dist) { return 0; }
+	return (pow(SMOOTHING_RADIUS - dist, 3)) / volume;
+}
+
+float CalculateDensity(vector<Particle>& particles, int pIndex) {
+	float density = 0;
+	
+	for (int i = 0; i < particles.size(); i++) {
+		if (i != pIndex) {
+			float dist = GetDistance(particles[i].curr, particles[pIndex].curr);
+			//cout << dist << endl;
+			float kernelForce = SmoothingKernel(dist);
+			density += MASS * kernelForce;
+			
+		}
+			
+		
+	}
+	return density;
+	
+}
+
+float SmoothingSlope(float dist) {
+	if (0 > SMOOTHING_RADIUS - dist) { return 0; }
+	return (dist - SMOOTHING_RADIUS)* (12.0f / pow(SMOOTHING_RADIUS, 4) * PI);
+}
+
+float DensityToPressure(float density) { // look into this?
+	return (density - targetDensity) * PRESSUREC;
+}
+
+
+
+int randSign() {
+	return pow(-1, rand() % 2);
+}
+
+vec2 CalculateForce(vector<Particle>& particles, int pIndex) { //calc property
+	vec2 pressure = {};
+	for (int i = 0; i < particles.size(); i++) {
+		if (i != pIndex) {
+			vec2 direction;
+			float dist = GetDistance(particles[i].curr, particles[pIndex].curr);
+			if (dist == 0.0f) {
+				direction = { randSign(), randSign() };
+			}
+			else {
+				direction = (particles[i].curr - particles[pIndex].curr) / dist;
+			}
+			
+			float slope = SmoothingSlope(dist);
+			float density = densities[i];
+			cout << density << endl;
+			if (density != 0) {
+				pressure += -DensityToPressure(density) * slope * direction * (float)MASS;
+			}
+			
+		}
+		
+
+	}
+	return pressure;
+}
 
 void GenerateParticle(GLfloat*& vertices, GLuint*& EBOIndices, int n) {
 	vertices[0] = 0.0;
@@ -70,9 +145,9 @@ void MakeParticleGrid(vector<Particle>& particles) {
 		c.vertices = vertices;
 		c.size = n;
 		c.curr.x = RADIUS * 2 + i * RADIUS * 2.5;
-		c.curr.y = RADIUS + j * RADIUS * 2.5;
-		c.prev.y = c.curr.y * 0.9;
-		c.prev.x = c.curr.x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (5)))* pow(-1, rand() % 3 + 1);
+		c.curr.y = 400 + RADIUS + j * RADIUS * 2.5;
+		c.prev.y = c.curr.y + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (10))) * pow(-1, rand() % 2);;
+		c.prev.x = c.curr.x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (10)))* pow(-1, rand() % 2);
 		c.acc.x = 0;
 		c.acc.y = 0;
 		particles.push_back(c);
