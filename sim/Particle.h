@@ -206,8 +206,7 @@ GLuint* CreateBuffers(GLfloat*& vertices, GLuint*& EBOIndices, int n) {
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, n * sizeof(GLuint), EBOIndices, GL_STATIC_DRAW);
-	glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT);
+	
 
 	buffers[0] = VAO;
 	buffers[1] = VBO;

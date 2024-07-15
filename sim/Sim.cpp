@@ -19,7 +19,7 @@
 
 
 
-void ParticleDensity(vector<Particle> particles, double xpos, double ypos) {
+void GetParticleDensity(vector<Particle> particles, double xpos, double ypos) {
 	//make this check the grid in the future
 	float density;
 	for (int i = 0; i < NUM_PARTICLES; i++) {
@@ -28,6 +28,17 @@ void ParticleDensity(vector<Particle> particles, double xpos, double ypos) {
 		}
 	}
 
+}
+
+float GetParticleDistance(Particle p1) {
+	vec2 diff = (p1.curr - p1.prev);
+	return sqrt(diff.x * diff.x + diff.y * diff.y);
+}
+
+
+
+vec2 CalcDisplacement(Particle p1) {
+	return p1.curr - p1.prev;
 }
 
 
@@ -53,7 +64,7 @@ bool processInput(GLFWwindow* window, vector<Particle>& particles) {
 		//getting cursor position
 		glfwGetCursorPos(window, &xpos, &ypos);
 		AddParticle(particles, xpos, ypos);
-		//ParticleDensity(particles, xpos, ypos);
+		//GetParticleDensity(particles, xpos, ypos);
 		prevTime = glfwGetTime();
 	}
 	if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS && glfwGetTime() - prevTime > 0.1) {
@@ -263,6 +274,8 @@ void BeginSim() {
 		densities.push_back(0.0f);
 		nearDensities.push_back(0.0f);
 	}
+	glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
 
 	while (!glfwWindowShouldClose(window)) {
 		bool nextFrame = processInput(window, particles);
@@ -275,9 +288,8 @@ void BeginSim() {
 
 				glm::mat4 model = glm::mat4(1.0f);
 				model = glm::translate(model, glm::vec3(particles[i].curr.x, particles[i].curr.y, 0.0f));
-				//glm::vec2 displacement = { particles[i].curr.x - particles[i].prev.x , particles[i].curr.y - particles[i].prev.y };
-				//float distance = sqrt((displacement.x * displacement.x)+ (displacement.y * displacement.y));
-				//glUniform4f(ColorLoc, (distance / 50), 1.0f, 1.0f, 1.0f);
+				float distance = GetParticleDistance(particles[i]);
+				glUniform4f(ColorLoc, distance/10.0f, 0.0f, 10.0f / (distance), 1.0f);
 				glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 				glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(proj));
 				
