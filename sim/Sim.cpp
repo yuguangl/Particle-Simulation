@@ -48,7 +48,7 @@ bool processInput(GLFWwindow* window, vector<Particle>& particles) {
 		}
 		pause = !pause;
 	}
-	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && glfwGetTime() - prevTime > 0.1) {
+	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && glfwGetTime() - prevTime > 0.05) {
 		double xpos, ypos;
 		//getting cursor position
 		glfwGetCursorPos(window, &xpos, &ypos);
@@ -73,7 +73,7 @@ bool processInput(GLFWwindow* window, vector<Particle>& particles) {
 	
 }
 
-void particleInvariantCheck(const vector<Particle> particles) {
+void particleInvariantCheck(const vector<Particle>& particles) {
 	int counter = 0;
 	for (int i = 0; i < NUM_PARTICLES; i++) {
 		if (particles[i].curr.x != particles[i].curr.x || particles[i].curr.x < 0 || particles[i].curr.x > WIDTH || particles[i].curr.y < 0 || particles[i].curr.y > HEIGHT) {
@@ -130,12 +130,19 @@ void collisionCheck(vector<Particle>& particles) {
 						int angle = rand() % 361;
 						norm.x = cos(angle) * RADIUS;
 						norm.y = sin(angle) * RADIUS;
+						particles[i].curr += norm;
+						particles[j].curr -= norm;
+						
+						//when they spawn in each other they have a lot of velocity for some reason
 					}
-					glm::vec2 displacement = particles[i].curr - particles[i].prev;
-					particles[i].curr += norm;
-					particles[j].curr -= norm;
-					particles[i].prev += displacement * 0.05f;
-					particles[j].prev -= displacement * 0.05f;
+					else {
+						glm::vec2 displacement = particles[i].curr - particles[i].prev;
+						particles[i].curr += norm;
+						particles[j].curr -= norm;
+						particles[i].prev += displacement * 0.05f;
+						particles[j].prev -= displacement * 0.05f;
+					}
+					
 				}
 			}
 		}
@@ -196,8 +203,6 @@ void Update(vector<Particle>& particles, GLFWwindow* window) {
 		initTime2 = glfwGetTime();
 	}
 	if (finalTime - initTime >= TIME_STEP) {
-		
-		
 		for (int i = 0; i < NUM_SUBSTEPS; i++) {
 			applyForces(particles);
 			collisionCheck(particles);
@@ -206,8 +211,6 @@ void Update(vector<Particle>& particles, GLFWwindow* window) {
 			checkBounds(particles);
 
 		}
-		
-		
 		initTime = glfwGetTime();
 		frames2++;
 	}
@@ -236,9 +239,9 @@ void BeginSim() {
 
 	glfwSwapBuffers(window);
 
-	GLuint* VAO = new GLuint[NUM_PARTICLES];
-	GLuint* VBO = new GLuint[NUM_PARTICLES];
-	GLuint* EBO = new GLuint[NUM_PARTICLES];
+	GLuint* VAO = new GLuint[MAX_PARTICLES];
+	GLuint* VBO = new GLuint[MAX_PARTICLES];
+	GLuint* EBO = new GLuint[MAX_PARTICLES];
 	MakeParticleGrid(particles);
 	MakeExtraParticles(particles);
 	for (int i = 0; i < MAX_PARTICLES; i++) {
@@ -317,7 +320,7 @@ void BeginSim() {
 
 int main() {
 	//Initialization
-	//srand(static_cast <unsigned> (time(0)));
+	srand(static_cast <unsigned> (time(0)));
 	glfwInit();
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);

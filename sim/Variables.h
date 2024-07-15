@@ -16,7 +16,7 @@ using namespace std;
 #define TARGET_FPS 60
 #define G 300
 #define TIME_STEP (1.0f / 70.0f)
-#define NUM_SUBSTEPS 5
+#define NUM_SUBSTEPS 1
 #define SUBSTEP TIME_STEP/NUM_SUBSTEPS
 #define SMOOTHING_RADIUS RADIUS*8
 #define CELL_SIZE 100
@@ -24,10 +24,10 @@ using namespace std;
 #define NUM_CELL_Y ceil(HEIGHT/CELL_SIZE)
 #define MASS 1
 #define PRESSUREC 100.0f
-#define MAX_PARTICLES 50
+#define MAX_PARTICLES 1000
 
 //globals
-int NUM_PARTICLES = 10;
+int NUM_PARTICLES = 300;
 bool pause = false; //obvious
 double prevTime = 0; // used to make sure button presses work properly
 double timeOffset = 0;//used to offset time after pause

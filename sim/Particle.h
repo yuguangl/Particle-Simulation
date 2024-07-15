@@ -163,29 +163,27 @@ void MakeParticleGrid(vector<Particle>& particles) {
 	int counter = 0;
 
 	while (counter < NUM_PARTICLES) {
-		int max = (WIDTH - RADIUS) / ((RADIUS * 6));
+		int max = (WIDTH - RADIUS) / ((RADIUS * 3));
 		if (i % max == 0) {
 			j++;
 			i = 0;
 		}
-		if (counter < NUM_PARTICLES) {
-			Particle c;
-			GLfloat* vertices = new GLfloat[n];
-			GLuint* EBOIndices = new GLuint[n];
-			GenerateParticle(vertices, EBOIndices, n);
-			c.EBOIndices = EBOIndices;
-			c.vertices = vertices;
-			c.size = n;
-			c.curr.x = RADIUS * 2 + i * RADIUS * 6;
-			c.curr.y = 200 + RADIUS + j * RADIUS * 6;
-			c.prev.y = c.curr.y; //+ static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (10))) * pow(-1, rand() % 2);;
-			c.prev.x = c.curr.x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (1))) * pow(-1, rand() % 2);
-			c.acc.x = 0;
-			c.acc.y = 0;
-			particles.push_back(c);
-			i++;
-			counter++;
-		}
+		Particle c;
+		GLfloat* vertices = new GLfloat[n];
+		GLuint* EBOIndices = new GLuint[n];
+		GenerateParticle(vertices, EBOIndices, n);
+		c.EBOIndices = EBOIndices;
+		c.vertices = vertices;
+		c.size = n;
+		c.curr.x = RADIUS * 2 + i * RADIUS * 3;
+		c.curr.y = RADIUS + j * RADIUS * 3;
+		c.prev.y = c.curr.y; //+ static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (10))) * pow(-1, rand() % 2);;
+		c.prev.x = c.curr.x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (1))) * pow(-1, rand() % 2);
+		c.acc.x = 0;
+		c.acc.y = 0;
+		particles.push_back(c);
+		i++;
+		counter++;
 		
 	}
 }
@@ -245,13 +243,13 @@ void AddParticle(vector<Particle>& particles, double xpos, double ypos) {
 	int n = (SEGMENTS * 3) + 3;
 
 	if (NUM_PARTICLES < MAX_PARTICLES) {
-		particles[NUM_PARTICLES - 1].size = n;
-		particles[NUM_PARTICLES - 1].curr.x = xpos;
-		particles[NUM_PARTICLES - 1].curr.y = ypos;
-		particles[NUM_PARTICLES - 1].prev.y = particles[NUM_PARTICLES - 1].curr.y;
-		particles[NUM_PARTICLES - 1].prev.x = particles[NUM_PARTICLES - 1].curr.x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (1))) * pow(-1, rand() % 2);
-		particles[NUM_PARTICLES - 1].acc.x = 0;
-		particles[NUM_PARTICLES - 1].acc.y = 0;
+		particles[NUM_PARTICLES].size = n;
+		particles[NUM_PARTICLES].curr.x = xpos;
+		particles[NUM_PARTICLES].curr.y = ypos;
+		particles[NUM_PARTICLES].prev.y = ypos;
+		particles[NUM_PARTICLES].prev.x = xpos + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (1))) * pow(-1, rand() % 2);
+		particles[NUM_PARTICLES].acc.x = 0;
+		particles[NUM_PARTICLES].acc.y = 0;
 		NUM_PARTICLES++;
 	}
 }
