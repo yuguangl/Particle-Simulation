@@ -19,30 +19,47 @@
 
 
 
+void ParticleDensity(vector<Particle> particles, double xpos, double ypos) {
+	//make this check the grid in the future
+	float density;
+	for (int i = 0; i < NUM_PARTICLES; i++) {
+		if (GetDistance(particles[i].curr, vec2{ xpos, ypos }) <= RADIUS) {
+			cout << i << " " << densities[i] << endl;
+		}
+	}
 
-bool processInput(GLFWwindow* window, const vector<Particle> particles) {
+}
+
+
+bool processInput(GLFWwindow* window, vector<Particle>& particles) {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
 		glfwSetWindowShouldClose(window, true);
 	}
 	else if (GetAsyncKeyState(' ') && glfwGetTime() - prevTime > 0.2) {
-		for (int i = 0; i < NUM_CIRCLES; i++) {
+		for (int i = 0; i < NUM_PARTICLES; i++) {
 			//cout << "circle[" << i << "]: (" << particles[i].curr.x << ", " << particles[i].curr.y << ")" << endl;
 		}
 		prevTime = glfwGetTime();
 		if (!pause) {
 			timeOffset = glfwGetTime();
-
 		}
 		else {
 			glfwSetTime(timeOffset);
 		}
 		pause = !pause;
 	}
+	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && glfwGetTime() - prevTime > 0.1) {
+		double xpos, ypos;
+		//getting cursor position
+		glfwGetCursorPos(window, &xpos, &ypos);
+		AddParticle(particles, xpos, ypos);
+		//ParticleDensity(particles, xpos, ypos);
+		prevTime = glfwGetTime();
+	}
 	if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS && glfwGetTime() - prevTime > 0.1) {
 		prevTime = glfwGetTime();
 		if (!pause) {
 			timeOffset = glfwGetTime();
-
 		}
 		else {
 			glfwSetTime(timeOffset);
@@ -53,11 +70,12 @@ bool processInput(GLFWwindow* window, const vector<Particle> particles) {
 	else {
 		return true;
 	}
+	
 }
 
 void particleInvariantCheck(const vector<Particle> particles) {
 	int counter = 0;
-	for (int i = 0; i < NUM_CIRCLES; i++) {
+	for (int i = 0; i < NUM_PARTICLES; i++) {
 		if (particles[i].curr.x != particles[i].curr.x || particles[i].curr.x < 0 || particles[i].curr.x > WIDTH || particles[i].curr.y < 0 || particles[i].curr.y > HEIGHT) {
 			counter++;
 		}
@@ -70,27 +88,33 @@ void particleInvariantCheck(const vector<Particle> particles) {
 
 
 void applyForces(vector<Particle>& particles) {
-	for (int i = 0; i < NUM_CIRCLES; i++) {
+	for (int i = 0; i < NUM_PARTICLES; i++) {
 		particles[i].acc.y = G / (float)NUM_SUBSTEPS;
-		//densities[i] = CalculateDensity(particles, i);
+		//densities[i] = CalculateDensity(particles, i).x;
+		//nearDensities[i] = CalculateDensity(particles, i).y;
+
 		
 		//TODO: HELPER FUNCTION THAT DETECTS WHERE SCREEN CLICK AND FIND THE PARTICLE AT THAT POINT
 	}
-	for (int i = 0; i < NUM_CIRCLES; i++) {
-		//vec2 force = CalculateForce(particles, i);
+	for (int i = 0; i < NUM_PARTICLES; i++) {
+		//vec2 force = CalculateForce1(particles, i);
 		
-		if (densities[i] != 0) {
-			//particles[i].acc += force / densities[i];
+		/*if (densities[i] != 0) {
+			particles[i].acc += ((force / densities[i]));
+			if (fabs(particles[i].acc.y) > 500 || fabs(particles[i].acc.y) > 500) {
+				cout << "force: " << force.x << " " << force.y << endl;
+				cout << "density: " << densities[i] << endl;
+			}
 			
-		}
+		}*/
 		
 		
 	}
 }
 
 void collisionCheck(vector<Particle>& particles) {
-	for (int i = 0; i < NUM_CIRCLES; i++) {
-		for (int j = 0; j < NUM_CIRCLES; j++) {
+	for (int i = 0; i < NUM_PARTICLES; i++) {
+		for (int j = 0; j < NUM_PARTICLES; j++) {
 			glm::vec2 axis = { particles[i].curr.x - particles[j].curr.x, particles[i].curr.y - particles[j].curr.y };
 			GLfloat dist = sqrt(axis.x * axis.x + axis.y * axis.y);
 			glm::vec2 norm;
@@ -120,7 +144,7 @@ void collisionCheck(vector<Particle>& particles) {
 
 void updatePositions(vector<Particle>& particles) {
 
-	for (int i = 0; i < NUM_CIRCLES; i++) {
+	for (int i = 0; i < NUM_PARTICLES; i++) {
 		glm::vec2 displacement = particles[i].curr - particles[i].prev;
 		particles[i].prev = particles[i].curr;
 		particles[i].acc *= TIME_STEP * TIME_STEP;
@@ -131,16 +155,18 @@ void updatePositions(vector<Particle>& particles) {
 }
 
 void checkBounds(vector<Particle>& particles) {
-	for (int i = 0; i < NUM_CIRCLES; i++) {
-		//TODO: replace with verlet integration
+	for (int i = 0; i < NUM_PARTICLES; i++) {
+		//IF THE WALLS ARE BEING WEIRD GET RID OF .PREV MODIFICATIONS
 		glm::vec2 displacement;
 		if (particles[i].curr.y + RADIUS >= HEIGHT) {
 			glm::vec2 displacement = particles[i].curr - particles[i].prev;
 			particles[i].curr.y = HEIGHT - RADIUS;
+			//particles[i].prev.y = particles[i].curr.y + displacement.y * 0.9f;
+
 		}
 		if (particles[i].curr.y - RADIUS <= 0) {
 			glm::vec2 displacement = particles[i].curr - particles[i].prev;
-			particles[i].curr.y = 1 + RADIUS;
+			particles[i].curr.y = RADIUS;
 		}
 
 		if (particles[i].curr.x + RADIUS >= WIDTH) {
@@ -175,7 +201,7 @@ void Update(vector<Particle>& particles, GLFWwindow* window) {
 		for (int i = 0; i < NUM_SUBSTEPS; i++) {
 			applyForces(particles);
 			collisionCheck(particles);
-			//checkBounds(particles);
+			checkBounds(particles);
 			updatePositions(particles);
 			checkBounds(particles);
 
@@ -203,18 +229,19 @@ void BeginSim() {
 	//generate particles
 	vector<Particle> particles;
 	int n = (SEGMENTS * 3) + 3;
-	MakeParticleGrid(particles);
+	
 
 	Shader shader("VertexShader", "FragmentShader");
 	Shader boundryShader("VertexShader", "FragmentShader");
 
 	glfwSwapBuffers(window);
 
-	GLuint* VAO = new GLuint[NUM_CIRCLES];
-	GLuint* VBO = new GLuint[NUM_CIRCLES];
-	GLuint* EBO = new GLuint[NUM_CIRCLES];
-
-	for (int i = 0; i < NUM_CIRCLES; i++) {
+	GLuint* VAO = new GLuint[NUM_PARTICLES];
+	GLuint* VBO = new GLuint[NUM_PARTICLES];
+	GLuint* EBO = new GLuint[NUM_PARTICLES];
+	MakeParticleGrid(particles);
+	MakeExtraParticles(particles);
+	for (int i = 0; i < MAX_PARTICLES; i++) {
 		GLuint* buffers = CreateBuffers(particles[i].vertices, particles[i].EBOIndices, n);
 		VAO[i] = buffers[0], VBO[i] = buffers[1], EBO[i] = buffers[2];
 	}
@@ -229,8 +256,9 @@ void BeginSim() {
 	initTime = glfwGetTime();
 	initTime2 = glfwGetTime();
 
-	for (int i = 0; i < NUM_CIRCLES; i++) {
+	for (int i = 0; i < NUM_PARTICLES; i++) {
 		densities.push_back(0.0f);
+		nearDensities.push_back(0.0f);
 	}
 
 	while (!glfwWindowShouldClose(window)) {
@@ -238,7 +266,7 @@ void BeginSim() {
 		shader.useShader();
 		if (!pause) {
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-			for (int i = 0; i < NUM_CIRCLES; i++) {
+			for (int i = 0; i < NUM_PARTICLES; i++) {
 				glBindVertexArray(VAO[i]);
 				glBindBuffer(GL_ARRAY_BUFFER, VBO[i]);
 
@@ -271,14 +299,15 @@ void BeginSim() {
 	//TODO: RUN VALGRIND
 	//TODO: change color with velocity
 	//TODO: chemical reactions and stuff
-	for (int i = 0; i < NUM_CIRCLES; i++) {
+	//TODO: https://www.benrogers.dev/
+	for (int i = 0; i < NUM_PARTICLES; i++) {
 		glDeleteVertexArrays(1, &VAO[i]);
 		glDeleteBuffers(1, &VBO[i]);
 		glDeleteBuffers(1, &EBO[i]);
 	}
 	shader.Delete();
 	glfwDestroyWindow(window);
-	for (int i = 0; i < NUM_CIRCLES; i++) {
+	for (int i = 0; i < NUM_PARTICLES; i++) {
 		delete[] particles[i].EBOIndices;
 		delete[] particles[i].vertices;
 	}

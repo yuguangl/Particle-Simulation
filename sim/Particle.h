@@ -23,52 +23,73 @@ struct Particle {
 
 
 
-float SmoothingKernel(float dist) {
+float DensityKernel(float dist) {
 	
 	float volume = PI * pow(SMOOTHING_RADIUS, 4) / 6.0f;
-	if (0 > SMOOTHING_RADIUS - dist) { return 0; }
-	return (pow(SMOOTHING_RADIUS - dist, 3)) / volume;
+	if (SMOOTHING_RADIUS < dist) { return 0; }
+	return (pow(SMOOTHING_RADIUS - dist, 2))*(6.0f / (pow(SMOOTHING_RADIUS, 4) * PI)); // /volume
 }
 
-float CalculateDensity(vector<Particle>& particles, int pIndex) {
-	float density = 0;
-	
+float NearKernel(float dist) {
+	float delta = SMOOTHING_RADIUS - dist;
+	return pow(delta, 3) * (10.0f / (PI * pow(SMOOTHING_RADIUS, 5)));
+}
+
+vec2 CalculateDensity(vector<Particle>& particles, int pIndex) {
+	float density = 0.0f;
+	float nearDensity = 0.0f;
 	for (int i = 0; i < particles.size(); i++) {
 		if (i != pIndex) {
 			float dist = GetDistance(particles[i].curr, particles[pIndex].curr);
 			//cout << dist << endl;
-			float kernelForce = SmoothingKernel(dist);
-			density += MASS * kernelForce;
+			if (dist <= SMOOTHING_RADIUS) {
+				density += MASS * DensityKernel(dist);
+				nearDensity += MASS * NearKernel(dist);
+			}
+			
 			
 		}
 			
 		
 	}
-	return density;
+	return vec2{density, nearDensity};
 	
 }
 
 float SmoothingSlope(float dist) {
 	if (0 > SMOOTHING_RADIUS - dist) { return 0; }
-	return (dist - SMOOTHING_RADIUS)* (12.0f / pow(SMOOTHING_RADIUS, 4) * PI);
+	return (3 * pow(SMOOTHING_RADIUS - dist, 2) *(10.0f / pow(SMOOTHING_RADIUS, 5) * PI));
+//	return -(10.0f * PI * pow(SMOOTHING_RADIUS - dist, 2) * (2 * SMOOTHING_RADIUS - 5 * dist) / pow(SMOOTHING_RADIUS, 6));
+}
+
+float NearSmoothingSlope(float dist) {
+	float delta = SMOOTHING_RADIUS - dist;
+	return -pow(delta, 2) * 30.0f / (pow(SMOOTHING_RADIUS, 5) * PI);
 }
 
 float DensityToPressure(float density) { // look into this?
 	return (density - targetDensity) * PRESSUREC;
 }
 
-
+float ReturnPressure(float d1, float d2) {
+	return (DensityToPressure(d1) + DensityToPressure(d2)) / 2.0f;
+}
 
 int randSign() {
 	return pow(-1, rand() % 2);
 }
 
-vec2 CalculateForce(vector<Particle>& particles, int pIndex) { //calc property
-	vec2 pressure = {};
+vec2 CalculateForce1(vector<Particle>& particles, int pIndex) { //calc property
+	vec2 Totalpressure = {};
+	float density = densities[pIndex];
+	float nearDensity = nearDensities[pIndex];
+	float pressure = DensityToPressure(density);
+	float nearPressure = DensityToPressure(nearDensity);
 	for (int i = 0; i < particles.size(); i++) {
 		if (i != pIndex) {
 			vec2 direction;
 			float dist = GetDistance(particles[i].curr, particles[pIndex].curr);
+
 			if (dist == 0.0f) {
 				direction = { randSign(), randSign() };
 			}
@@ -76,18 +97,28 @@ vec2 CalculateForce(vector<Particle>& particles, int pIndex) { //calc property
 				direction = (particles[i].curr - particles[pIndex].curr) / dist;
 			}
 			
+			
 			float slope = SmoothingSlope(dist);
-			float density = densities[i];
-			cout << density << endl;
-			if (density != 0) {
-				pressure += -DensityToPressure(density) * slope * direction * (float)MASS;
+			float neighborDensity = densities[i];
+			float nearNeighborDensity = nearDensities[i];
+			float neighborPressure = DensityToPressure(neighborDensity);
+			float nearNeighborPressure = DensityToPressure(nearNeighborDensity);
+
+			float sharedPressure = ReturnPressure(pressure, neighborPressure);
+			float nearSharedPressure = ReturnPressure(nearPressure, nearNeighborPressure);
+			
+			if (density != 0 && neighborDensity != 0 && nearNeighborDensity != 0) {
+				
+
+				Totalpressure += direction * SmoothingSlope(dist) * sharedPressure / neighborDensity;
+				Totalpressure += direction * NearSmoothingSlope(dist) * nearSharedPressure / nearNeighborDensity;
 			}
 			
 		}
 		
 
 	}
-	return pressure;
+	return Totalpressure;
 }
 
 void GenerateParticle(GLfloat*& vertices, GLuint*& EBOIndices, int n) {
@@ -131,28 +162,31 @@ void MakeParticleGrid(vector<Particle>& particles) {
 	int i = 0;
 	int counter = 0;
 
-	while (counter < NUM_CIRCLES) {
-		int max = (WIDTH - RADIUS) / ((RADIUS * 2.5));
+	while (counter < NUM_PARTICLES) {
+		int max = (WIDTH - RADIUS) / ((RADIUS * 6));
 		if (i % max == 0) {
 			j++;
 			i = 0;
 		}
-		Particle c;
-		GLfloat* vertices = new GLfloat[n];
-		GLuint* EBOIndices = new GLuint[n];
-		GenerateParticle(vertices, EBOIndices, n);
-		c.EBOIndices = EBOIndices;
-		c.vertices = vertices;
-		c.size = n;
-		c.curr.x = RADIUS * 2 + i * RADIUS * 2.5;
-		c.curr.y = 400 + RADIUS + j * RADIUS * 2.5;
-		c.prev.y = c.curr.y + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (10))) * pow(-1, rand() % 2);;
-		c.prev.x = c.curr.x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (10)))* pow(-1, rand() % 2);
-		c.acc.x = 0;
-		c.acc.y = 0;
-		particles.push_back(c);
-		i++;
-		counter++;
+		if (counter < NUM_PARTICLES) {
+			Particle c;
+			GLfloat* vertices = new GLfloat[n];
+			GLuint* EBOIndices = new GLuint[n];
+			GenerateParticle(vertices, EBOIndices, n);
+			c.EBOIndices = EBOIndices;
+			c.vertices = vertices;
+			c.size = n;
+			c.curr.x = RADIUS * 2 + i * RADIUS * 6;
+			c.curr.y = 200 + RADIUS + j * RADIUS * 6;
+			c.prev.y = c.curr.y; //+ static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (10))) * pow(-1, rand() % 2);;
+			c.prev.x = c.curr.x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (1))) * pow(-1, rand() % 2);
+			c.acc.x = 0;
+			c.acc.y = 0;
+			particles.push_back(c);
+			i++;
+			counter++;
+		}
+		
 	}
 }
 
@@ -181,4 +215,43 @@ GLuint* CreateBuffers(GLfloat*& vertices, GLuint*& EBOIndices, int n) {
 	buffers[1] = VBO;
 	buffers[2] = EBO;
 	return buffers;
+}
+
+void MakeExtraParticles(vector<Particle>& particles) {
+	int i = NUM_PARTICLES;
+	int n = (SEGMENTS * 3) + 3;
+	
+	while(i < MAX_PARTICLES) {
+		Particle c;
+		GLfloat* vertices = new GLfloat[n];
+		GLuint* EBOIndices = new GLuint[n];
+		GenerateParticle(vertices, EBOIndices, n);
+		c.EBOIndices = EBOIndices;
+		c.vertices = vertices;
+		c.size = n;
+		c.curr.x = 0;
+		c.curr.y = 0;
+		c.prev.y = 0;
+		c.prev.x = 0;
+		c.acc.x = 0;
+		c.acc.y = 0;
+		particles.push_back(c);
+		i++;
+
+	}
+}
+
+void AddParticle(vector<Particle>& particles, double xpos, double ypos) {
+	int n = (SEGMENTS * 3) + 3;
+
+	if (NUM_PARTICLES < MAX_PARTICLES) {
+		particles[NUM_PARTICLES - 1].size = n;
+		particles[NUM_PARTICLES - 1].curr.x = xpos;
+		particles[NUM_PARTICLES - 1].curr.y = ypos;
+		particles[NUM_PARTICLES - 1].prev.y = particles[NUM_PARTICLES - 1].curr.y;
+		particles[NUM_PARTICLES - 1].prev.x = particles[NUM_PARTICLES - 1].curr.x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (1))) * pow(-1, rand() % 2);
+		particles[NUM_PARTICLES - 1].acc.x = 0;
+		particles[NUM_PARTICLES - 1].acc.y = 0;
+		NUM_PARTICLES++;
+	}
 }
