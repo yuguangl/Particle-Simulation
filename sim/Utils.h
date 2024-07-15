@@ -14,6 +14,8 @@ float GetDistance(vec2 p1, vec2 p2) {
 	return sqrt(diff.x * diff.x + diff.y * diff.y);
 }
 
-
+int GetHashIndex(int a, int b) { //Cantor pairing function
+	return (a + b) * (a + b + 1) / 2 + a;
+}
 
 

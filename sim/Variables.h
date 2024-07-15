@@ -20,8 +20,8 @@ using namespace std;
 #define SUBSTEP TIME_STEP/NUM_SUBSTEPS
 #define SMOOTHING_RADIUS RADIUS*8
 #define CELL_SIZE 100
-#define NUM_CELL_X ceil(WIDTH/CELL_SIZE)
-#define NUM_CELL_Y ceil(HEIGHT/CELL_SIZE)
+#define NUM_CELLS_X ceil(WIDTH/CELL_SIZE)
+#define NUM_CELLS_Y ceil(HEIGHT/CELL_SIZE)
 #define MASS 1
 #define PRESSUREC 100.0f
 #define MAX_PARTICLES 1000
@@ -47,6 +47,8 @@ vector<float> property;
 vector<float> densities;
 vector<float> nearDensities;
 float targetDensity = 1;
+int cellLookup[MAX_PARTICLES];
+int groupIndices[MAX_PARTICLES];
 
 
 #endif

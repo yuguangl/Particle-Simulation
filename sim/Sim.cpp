@@ -10,13 +10,60 @@
 #include <time.h>
 #include <math.h>
 #include <stdio.h>
+#include  <algorithm>
+
 #include "Variables.h"
-
-
 #include "Particle.h"
 #include "Shader.h"
 #include "Boundry.h"
 
+using namespace std;
+
+int getCellKey(int x, int y) {
+	int hash = GetHashIndex(x / NUM_CELLS_X, y / NUM_CELLS_Y) % NUM_PARTICLES;
+	return hash;
+}
+
+void AssignCell(Particle p, int i) {
+	int x = p.curr.x / NUM_CELLS_X;
+	int y = p.curr.y / NUM_CELLS_Y;
+	int hash = GetHashIndex(x, y) % NUM_PARTICLES;
+	cellLookup[i] = hash;
+}
+
+void PopulateGrid(const vector<Particle>& particles) {
+	for (int i = 0; i < NUM_PARTICLES; i++) {
+		AssignCell(particles[i], i);
+	}
+	sort(cellLookup, cellLookup + NUM_PARTICLES);
+	fill_n(groupIndices, NUM_PARTICLES, -1);
+	int prev = -1;
+	for (int i = 0; i < NUM_PARTICLES; i++) {
+		if (cellLookup[i] != prev) {
+			prev = cellLookup[i];
+			groupIndices[prev] = i;
+		}
+	}
+}
+
+void GetCellParticles(int x, int y, const vector<Particle> &particles) {
+	int cellKey = getCellKey(x, y);
+	int lookupPos = groupIndices[cellKey];
+	int prev = cellLookup[lookupPos];
+	vector<Particle> callNeighbors;
+	while (prev == cellLookup[lookupPos] && lookupPos < NUM_PARTICLES) {
+		lookupPos++;
+	}
+}
+
+void HighlightNeighbors(GLFWwindow* window, const vector<Particle> &particles) {
+	double x, y;
+	glfwGetCursorPos(window, &x, &y);
+	int ix = x;
+	int iy = y;
+	//FINISH LOOK UP WITH SECOND ARRAY MAYBE AND MERGESORT FROM ALGO
+	//glUniform4f(ColorLoc, distance/10.0f, 0.0f, 10.0f / (distance), 1.0f);
+}
 
 
 void GetParticleDensity(vector<Particle> particles, double xpos, double ypos) {
@@ -34,8 +81,6 @@ float GetParticleDistance(Particle p1) {
 	vec2 diff = (p1.curr - p1.prev);
 	return sqrt(diff.x * diff.x + diff.y * diff.y);
 }
-
-
 
 vec2 CalcDisplacement(Particle p1) {
 	return p1.curr - p1.prev;
@@ -61,7 +106,6 @@ bool processInput(GLFWwindow* window, vector<Particle>& particles) {
 	}
 	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && glfwGetTime() - prevTime > 0.05) {
 		double xpos, ypos;
-		//getting cursor position
 		glfwGetCursorPos(window, &xpos, &ypos);
 		AddParticle(particles, xpos, ypos);
 		//GetParticleDensity(particles, xpos, ypos);
@@ -78,10 +122,8 @@ bool processInput(GLFWwindow* window, vector<Particle>& particles) {
 		pause = !pause;
 		return true;
 	}
-	else {
-		return true;
-	}
 	
+	return true;
 }
 
 void particleInvariantCheck(const vector<Particle>& particles) {
@@ -95,8 +137,6 @@ void particleInvariantCheck(const vector<Particle>& particles) {
 		cout << "Particles Lost: " << counter << endl;
 	}
 }
-
-
 
 void applyForces(vector<Particle>& particles) {
 	for (int i = 0; i < NUM_PARTICLES; i++) {
@@ -215,6 +255,7 @@ void Update(vector<Particle>& particles, GLFWwindow* window) {
 	}
 	if (finalTime - initTime >= TIME_STEP) {
 		for (int i = 0; i < NUM_SUBSTEPS; i++) {
+			PopulateGrid(particles);
 			applyForces(particles);
 			collisionCheck(particles);
 			checkBounds(particles);
@@ -274,7 +315,9 @@ void BeginSim() {
 		densities.push_back(0.0f);
 		nearDensities.push_back(0.0f);
 	}
-	glClearColor(0.3f, 0.3f, 0.3f, 1.0f);
+	PopulateGrid(particles);
+
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	while (!glfwWindowShouldClose(window)) {
@@ -312,9 +355,9 @@ void BeginSim() {
 	}
 
 	//TODO: RUN VALGRIND
-	//TODO: change color with velocity
 	//TODO: chemical reactions and stuff
 	//TODO: https://www.benrogers.dev/
+	//TOD): MAKE PARTICLES PUBLIC
 	for (int i = 0; i < NUM_PARTICLES; i++) {
 		glDeleteVertexArrays(1, &VAO[i]);
 		glDeleteBuffers(1, &VBO[i]);
