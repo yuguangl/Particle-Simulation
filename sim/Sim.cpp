@@ -10,7 +10,7 @@
 #include <time.h>
 #include <math.h>
 #include <stdio.h>
-#include <algorithm>
+#include  <algorithm>
 
 #include "Variables.h"
 #include "Particle.h"
@@ -22,6 +22,7 @@ vector<Particle> particles;
 
 void GetParticleDensity( double xpos, double ypos) {
 	//make this check the grid in the future
+	float density;
 	for (int i = 0; i < NUM_PARTICLES; i++) {
 		if (GetDistance(particles[i].curr, vec2{ xpos, ypos }) <= RADIUS) {
 			cout << i << " " << densities[i] << endl;
@@ -116,36 +117,33 @@ void applyForces() {
 	}
 }
 
-void CheckCollision(vector<int> & neighbors ,int i) {
-	for (int j = 0; j < neighbors.size(); j++) {
-		Particle p = particles[neighbors[j]];
-		vec2 axis = { particles[i].curr.x - p.curr.x, particles[i].curr.y - p.curr.y };
-		GLfloat dist = sqrt(axis.x * axis.x + axis.y * axis.y);
-		vec2 norm;
-		if (i != neighbors[j]) {
-			if (dist < RADIUS * 2) {
-				norm = { axis.x / dist, axis.y / dist };
-				GLfloat delta = (RADIUS * 2) - dist;
-				delta *= 0.75f;
-				norm = { norm.x * delta * 0.5f, norm.y * delta * 0.5f };
-				if (dist == 0) {
-					int angle = rand() % 361;
-					norm.x = cos(angle) * RADIUS;
-					norm.y = sin(angle) * RADIUS;
-					particles[i].curr += norm;
-					p.curr -= norm;
+void CheckCollision(int j ,int i) {
+	glm::vec2 axis = { particles[i].curr.x - particles[j].curr.x, particles[i].curr.y - particles[j].curr.y };
+	GLfloat dist = sqrt(axis.x * axis.x + axis.y * axis.y);
+	glm::vec2 norm;
+	if (i != j) {
+		if (dist < RADIUS * 2) {
+			norm = { axis.x / dist, axis.y / dist };
+			GLfloat delta = (RADIUS * 2) - dist;
+			delta *= 0.75f;
+			norm = { norm.x * delta * 0.5f, norm.y * delta * 0.5f };
+			if (dist == 0) {
+				int angle = rand() % 361;
+				norm.x = cos(angle) * RADIUS;
+				norm.y = sin(angle) * RADIUS;
+				particles[i].curr += norm;
+				particles[j].curr -= norm;
 
-					//when they spawn in each other they have a lot of velocity for some reason
-				}
-				else {
-					vec2 displacement = particles[i].curr - particles[i].prev;
-					particles[i].curr += norm;
-					p.curr -= norm;
-					//particles[i].prev += displacement * 0.05f;
-					//p.prev -= displacement * 0.05f;
-				}
-
+				//when they spawn in each other they have a lot of velocity for some reason
 			}
+			else {
+				glm::vec2 displacement = particles[i].curr - particles[i].prev;
+				particles[i].curr += norm;
+				particles[j].curr -= norm;
+				particles[i].prev += displacement * 0.05f;
+				particles[j].prev -= displacement * 0.05f;
+			}
+
 		}
 	}
 }
@@ -158,7 +156,7 @@ int getCellKey(int x, int y) {
 	return hash;
 }
 
-void AssignCell(const Particle p, int i) {
+void AssignCell(const Particle& p, int i) {
 	int x = p.curr.x / CELL_SIZE;
 	int y = p.curr.y / CELL_SIZE;
 	int hash = GetHashIndex(x, y) % NUM_PARTICLES;
@@ -168,19 +166,12 @@ void AssignCell(const Particle p, int i) {
 	cellLookup[i] = t;
 }
 
-bool customSort(const Tuple& t1, const Tuple& t2) {
-	return t1.hId < t2.hId;
-}
-
-
 void PopulateGrid() {
-	
 	for (int i = 0; i < NUM_PARTICLES; i++) {
 		AssignCell(particles[i], i);
 	}
-
-	sort(cellLookup, cellLookup + NUM_PARTICLES, customSort);
-	//FUCK WHAT IS GOING ON
+	
+	sort(cellLookup, cellLookup + NUM_PARTICLES);
 	fill_n(groupIndices, NUM_PARTICLES, -1);
 	int prev = -1;
 	for (int i = 0; i < NUM_PARTICLES; i++) {
@@ -191,7 +182,7 @@ void PopulateGrid() {
 	}
 }
 
-vector<int> GetCellParticles(int x, int y) {
+void GetCellParticles(int x, int y, int i) {
 	int cellKey = getCellKey(x, y);
 	int pos = groupIndices[cellKey];
 
@@ -199,21 +190,21 @@ vector<int> GetCellParticles(int x, int y) {
 
 	vector<int> cellNeighbors;
 	if (pos == -1) {
-		return cellNeighbors;
+		return;
 	}
 	while (prev == cellLookup[pos].hId && pos < NUM_PARTICLES) {
-		cellNeighbors.push_back(cellLookup[pos].pId);
+		CheckCollision(cellLookup[pos].pId, i);
 		pos++;
 	}
-	return cellNeighbors;
+	
 }
 
 void BruteForceCollisionCheck() {
 	for (int i = 0; i < NUM_PARTICLES; i++) {
 		for (int j = 0; j < NUM_PARTICLES; j++) {
-			vec2 axis = { particles[i].curr.x - particles[j].curr.x, particles[i].curr.y - particles[j].curr.y };
+			glm::vec2 axis = { particles[i].curr.x - particles[j].curr.x, particles[i].curr.y - particles[j].curr.y };
 			GLfloat dist = sqrt(axis.x * axis.x + axis.y * axis.y);
-			vec2 norm;
+			glm::vec2 norm;
 			if (i !=j) {
 				if (dist < RADIUS * 2) {
 					norm = { axis.x / dist, axis.y / dist };
@@ -230,7 +221,7 @@ void BruteForceCollisionCheck() {
 						//when they spawn in each other they have a lot of velocity for some reason
 					}
 					else {
-						vec2 displacement = particles[i].curr - particles[i].prev;
+						glm::vec2 displacement = particles[i].curr - particles[i].prev;
 						particles[i].curr += norm;
 						particles[j].curr -= norm;
 						particles[i].prev += displacement * 0.05f;
@@ -243,74 +234,58 @@ void BruteForceCollisionCheck() {
 	}
 }
 
-void GetNeighbors(Particle p, int i) {
-
-	int x = (int)p.curr.x;
-	int y = (int)p.curr.y;
-	vector<int> cellNeighbors;
-
-	//cellNeighbors = GetCellParticles(x, y);
-	//CheckCollision(cellNeighbors, i);
-	/*cellNeighbors = GetCellParticles(x - CELL_SIZE, y);
-	CheckCollision(cellNeighbors, i);
-	cellNeighbors = GetCellParticles(x + CELL_SIZE, y);
-	CheckCollision(cellNeighbors, i);
-	cellNeighbors = GetCellParticles(x, y - CELL_SIZE);
-	CheckCollision(cellNeighbors, i);
-	cellNeighbors = GetCellParticles(x, y + CELL_SIZE);
-	CheckCollision(cellNeighbors, i);
-	cellNeighbors = GetCellParticles(x + CELL_SIZE, y + CELL_SIZE);
-	CheckCollision(cellNeighbors, i);
-	cellNeighbors = GetCellParticles(x + CELL_SIZE, y - CELL_SIZE);
-	CheckCollision(cellNeighbors, i);
-	cellNeighbors = GetCellParticles(x - CELL_SIZE, y - CELL_SIZE);
-	CheckCollision(cellNeighbors, i);
-	cellNeighbors = GetCellParticles(x - CELL_SIZE, y + CELL_SIZE);
-	CheckCollision(cellNeighbors, i);*/
-
-}
 
 
 void HandleCollisions() {
 	for (int i = 0; i < NUM_PARTICLES; i++) {
-		GetNeighbors(particles[i], i);
+		int x = particles[i].curr.x;
+		int y = particles[i].curr.y;
+		GetCellParticles(x, y, i);
+		GetCellParticles(x - CELL_SIZE, y, i);
+		GetCellParticles(x + CELL_SIZE, y, i);
+		GetCellParticles(x, y - CELL_SIZE, i);
+		GetCellParticles(x, y + CELL_SIZE, i);
+		GetCellParticles(x + CELL_SIZE, y + CELL_SIZE, i);
+		GetCellParticles(x + CELL_SIZE, y - CELL_SIZE, i);
+		GetCellParticles(x - CELL_SIZE, y - CELL_SIZE, i);
+		GetCellParticles(x - CELL_SIZE, y + CELL_SIZE, i);
 	}
 }
 
 void updatePositions() {
 
 	for (int i = 0; i < NUM_PARTICLES; i++) {
-		vec2 displacement = particles[i].curr - particles[i].prev;
+		glm::vec2 displacement = particles[i].curr - particles[i].prev;
 		particles[i].prev = particles[i].curr;
 		particles[i].acc *= TIME_STEP * TIME_STEP;
 		//cout << particles[i].acc.x << endl;
 		particles[i].curr += displacement + particles[i].acc;
-		particles[i].acc = {0,0};
+		particles[i].acc = {};
 	}
 }
 
 void checkBounds() {
 	for (int i = 0; i < NUM_PARTICLES; i++) {
 		//IF THE WALLS ARE BEING WEIRD GET RID OF .PREV MODIFICATIONS
-		vec2 displacement;
+		glm::vec2 displacement;
 		if (particles[i].curr.y + RADIUS >= HEIGHT) {
-			vec2 displacement = particles[i].curr - particles[i].prev;
+			glm::vec2 displacement = particles[i].curr - particles[i].prev;
 			particles[i].curr.y = HEIGHT - RADIUS;
 			//particles[i].prev.y = particles[i].curr.y + displacement.y * 0.9f;
 
 		}
 		if (particles[i].curr.y - RADIUS <= 0) {
-			vec2 displacement = particles[i].curr - particles[i].prev;
+			glm::vec2 displacement = particles[i].curr - particles[i].prev;
 			particles[i].curr.y = RADIUS;
 		}
 
 		if (particles[i].curr.x + RADIUS >= WIDTH) {
-			vec2 displacement = particles[i].curr - particles[i].prev;
+			glm::vec2 displacement = particles[i].curr - particles[i].prev;
 			particles[i].curr.x = WIDTH - RADIUS;
 
 		}
 		if (particles[i].curr.x - RADIUS <= 0) {
-			vec2 displacement = particles[i].curr - particles[i].prev;
+			glm::vec2 displacement = particles[i].curr - particles[i].prev;
 			particles[i].curr.x = RADIUS;
 		}
 	}
@@ -332,10 +307,10 @@ void Update(GLFWwindow* window) {
 	}
 	if (finalTime - initTime >= TIME_STEP) {
 		for (int i = 0; i < NUM_SUBSTEPS; i++) {
-			//PopulateGrid();
+			PopulateGrid();
 			applyForces();
-			BruteForceCollisionCheck();
-			//HandleCollisions();
+			//BruteForceCollisionCheck();
+			HandleCollisions();
 			checkBounds();
 			updatePositions();
 			checkBounds();
@@ -372,10 +347,8 @@ void BeginSim() {
 	GLuint* VAO = new GLuint[MAX_PARTICLES];
 	GLuint* VBO = new GLuint[MAX_PARTICLES];
 	GLuint* EBO = new GLuint[MAX_PARTICLES];
-
 	MakeParticleGrid(particles);
 	MakeExtraParticles(particles);
-
 	for (int i = 0; i < MAX_PARTICLES; i++) {
 		GLuint* buffers = CreateBuffers(particles[i].vertices, particles[i].EBOIndices, n);
 		VAO[i] = buffers[0], VBO[i] = buffers[1], EBO[i] = buffers[2];
@@ -395,7 +368,6 @@ void BeginSim() {
 		densities.push_back(0.0f);
 		nearDensities.push_back(0.0f);
 	}
-	PopulateGrid();
 
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -410,7 +382,7 @@ void BeginSim() {
 				glBindBuffer(GL_ARRAY_BUFFER, VBO[i]);
 
 				glm::mat4 model = glm::mat4(1.0f);
-				model = glm::translate(model, vec3(particles[i].curr.x, particles[i].curr.y, 0.0f));
+				model = glm::translate(model, glm::vec3(particles[i].curr.x, particles[i].curr.y, 0.0f));
 				float distance = GetParticleDistance(particles[i]);
 				glUniform4f(ColorLoc, distance/10.0f, 0.0f, 10.0f / (distance), 1.0f);
 				glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
@@ -446,7 +418,7 @@ void BeginSim() {
 	shader.Delete();
 	glfwDestroyWindow(window);
 	for (int i = 0; i < NUM_PARTICLES; i++) {
-		glDeleteBuffers(1, particles[i].EBOIndices);
+		delete[] particles[i].EBOIndices;
 		delete[] particles[i].vertices;
 	}
 	glfwTerminate();
@@ -455,7 +427,7 @@ void BeginSim() {
 
 int main() {
 	//Initialization
-	srand(static_cast <unsigned> (time(0)));
+	//srand(static_cast <unsigned> (time(0)));
 	glfwInit();
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
