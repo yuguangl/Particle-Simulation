@@ -10,8 +10,6 @@ using namespace std;
 using namespace glm;
 
 
-
-
 struct Particle {
 	int size;
 	GLfloat* vertices;
@@ -19,20 +17,21 @@ struct Particle {
 	vec2 acc;
 	vec2 prev;
 	vec2 curr;
+
 };
 
 
 
 float DensityKernel(float dist) {
 	
-	float volume = PI * pow(SMOOTHING_RADIUS, 4) / 6.0f;
+	float volume = (float)((PI * pow(SMOOTHING_RADIUS, 4)) / 6.0f);
 	if (SMOOTHING_RADIUS < dist) { return 0; }
-	return (pow(SMOOTHING_RADIUS - dist, 2))*(6.0f / (pow(SMOOTHING_RADIUS, 4) * PI)); // /volume
+	return (float)((pow(SMOOTHING_RADIUS - dist, 2)) * (6.0f / (pow(SMOOTHING_RADIUS, 4) * PI))); // /volume
 }
 
 float NearKernel(float dist) {
 	float delta = SMOOTHING_RADIUS - dist;
-	return pow(delta, 3) * (10.0f / (PI * pow(SMOOTHING_RADIUS, 5)));
+	return (float)(pow(delta, 3) * (10.0f / (PI * pow(SMOOTHING_RADIUS, 5))));
 }
 
 vec2 CalculateDensity(vector<Particle>& particles, int pIndex) {
@@ -58,13 +57,13 @@ vec2 CalculateDensity(vector<Particle>& particles, int pIndex) {
 
 float SmoothingSlope(float dist) {
 	if (0 > SMOOTHING_RADIUS - dist) { return 0; }
-	return (3 * pow(SMOOTHING_RADIUS - dist, 2) *(10.0f / pow(SMOOTHING_RADIUS, 5) * PI));
+	return (float)((3 * pow(SMOOTHING_RADIUS - dist, 2) * (10.0f / pow(SMOOTHING_RADIUS, 5) * PI)));
 //	return -(10.0f * PI * pow(SMOOTHING_RADIUS - dist, 2) * (2 * SMOOTHING_RADIUS - 5 * dist) / pow(SMOOTHING_RADIUS, 6));
 }
 
 float NearSmoothingSlope(float dist) {
 	float delta = SMOOTHING_RADIUS - dist;
-	return -pow(delta, 2) * 30.0f / (pow(SMOOTHING_RADIUS, 5) * PI);
+	return (float)(-pow(delta, 2) * 30.0f / (pow(SMOOTHING_RADIUS, 5) * PI));
 }
 
 float DensityToPressure(float density) { // look into this?
@@ -76,7 +75,7 @@ float ReturnPressure(float d1, float d2) {
 }
 
 int randSign() {
-	return pow(-1, rand() % 2);
+	return (float)pow(-1, rand() % 2);
 }
 
 vec2 CalculateForce1(vector<Particle>& particles, int pIndex) { //calc property
@@ -243,10 +242,10 @@ void AddParticle(vector<Particle>& particles, double xpos, double ypos) {
 
 	if (NUM_PARTICLES < MAX_PARTICLES) {
 		particles[NUM_PARTICLES].size = n;
-		particles[NUM_PARTICLES].curr.x = xpos;
-		particles[NUM_PARTICLES].curr.y = ypos;
-		particles[NUM_PARTICLES].prev.y = ypos;
-		particles[NUM_PARTICLES].prev.x = xpos + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (1))) * pow(-1, rand() % 2);
+		particles[NUM_PARTICLES].curr.x = (float)xpos;
+		particles[NUM_PARTICLES].curr.y = (float)ypos;
+		particles[NUM_PARTICLES].prev.y = (float)ypos;
+		particles[NUM_PARTICLES].prev.x = (float)xpos + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (1))) * pow(-1, rand() % 2);
 		particles[NUM_PARTICLES].acc.x = 0;
 		particles[NUM_PARTICLES].acc.y = 0;
 		NUM_PARTICLES++;

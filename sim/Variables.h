@@ -6,6 +6,17 @@
 #include <unordered_map>
 #include <vector>
 
+struct Tuple {
+	int pId;
+	int hId;
+
+	bool operator< (const Tuple& o) const{
+		return hId < o.hId;
+	}
+};
+
+
+
 using namespace std;
 
 #define PI 3.1415926535897932384626433
@@ -19,7 +30,7 @@ using namespace std;
 #define NUM_SUBSTEPS 1
 #define SUBSTEP TIME_STEP/NUM_SUBSTEPS
 #define SMOOTHING_RADIUS RADIUS*8
-#define CELL_SIZE 100
+#define CELL_SIZE 50
 #define NUM_CELLS_X ceil(WIDTH/CELL_SIZE)
 #define NUM_CELLS_Y ceil(HEIGHT/CELL_SIZE)
 #define MASS 1
@@ -47,7 +58,7 @@ vector<float> property;
 vector<float> densities;
 vector<float> nearDensities;
 float targetDensity = 1;
-int cellLookup[MAX_PARTICLES];
+Tuple cellLookup[MAX_PARTICLES];
 int groupIndices[MAX_PARTICLES];
 
 
