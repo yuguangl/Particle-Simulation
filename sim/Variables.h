@@ -20,11 +20,11 @@ struct Tuple {
 using namespace std;
 
 #define PI 3.1415926535897932384626433
-#define SEGMENTS 25 // just dont go over 90 for some reason
+#define SEGMENTS 20 // just dont go over 90 for some reason
 #define RADIUS 7 // <= 1
-#define WIDTH 1000
-#define HEIGHT 1000
-#define TARGET_FPS 100
+#define WIDTH 1200
+#define HEIGHT 1200
+#define TARGET_FPS 70
 #define G 300
 #define TIME_STEP (1.0f / TARGET_FPS)
 #define NUM_SUBSTEPS 1
@@ -35,10 +35,11 @@ using namespace std;
 #define NUM_CELLS_Y ceil(HEIGHT/CELL_SIZE)
 #define MASS 1
 #define PRESSUREC 100.0f
-#define MAX_PARTICLES 3000
+#define MAX_PARTICLES 10000
+#define NUM_THREADS 4
 
 //globals
-int NUM_PARTICLES = 1000;
+int NUM_PARTICLES = 2000;
 bool pause = false; //obvious
 double prevTime = 0; // used to make sure button presses work properly
 double timeOffset = 0;//used to offset time after pause
@@ -50,16 +51,13 @@ double initTime2 = 0;
 double realTime; //for testing purposes
 int frames2 = 0;
 float dampening = 0.5;
-int c = 0;
-int a = 0;
-//vector<Particle> particles;
-//unordered_map<glm::vec2, vector<int>> spaceMap;
-vector<float> property;
-vector<float> densities;
-vector<float> nearDensities;
+float densities[MAX_PARTICLES];
+float nearDensities[MAX_PARTICLES];
 float targetDensity = 1;
 Tuple cellLookup[MAX_PARTICLES];
 int groupIndices[MAX_PARTICLES];
+int hashes[MAX_PARTICLES];
+
 
 
 #endif

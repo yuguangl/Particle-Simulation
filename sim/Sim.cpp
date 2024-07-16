@@ -10,14 +10,17 @@
 #include <time.h>
 #include <math.h>
 #include <stdio.h>
-#include  <algorithm>
+#include <algorithm>
+#include <stdlib.h>
+#include <thread>
 
 #include "Variables.h"
 #include "Particle.h"
 #include "Shader.h"
 #include "Boundry.h"
 
-vector<Particle> particles;
+
+Particle particles[MAX_PARTICLES];
 
 
 void GetParticleDensity( double xpos, double ypos) {
@@ -28,7 +31,6 @@ void GetParticleDensity( double xpos, double ypos) {
 			cout << i << " " << densities[i] << endl;
 		}
 	}
-
 }
 
 float GetParticleDistance(Particle p1) {
@@ -46,9 +48,6 @@ bool processInput(GLFWwindow* window) {
 		glfwSetWindowShouldClose(window, true);
 	}
 	else if (GetAsyncKeyState(' ') && glfwGetTime() - prevTime > 0.2) {
-		for (int i = 0; i < NUM_PARTICLES; i++) {
-			//cout << "circle[" << i << "]: (" << particles[i].curr.x << ", " << particles[i].curr.y << ")" << endl;
-		}
 		prevTime = glfwGetTime();
 		if (!pause) {
 			timeOffset = glfwGetTime();
@@ -58,7 +57,7 @@ bool processInput(GLFWwindow* window) {
 		}
 		pause = !pause;
 	}
-	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && glfwGetTime() - prevTime > 0.05) {
+	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && glfwGetTime() - prevTime > 0.02) {
 		double xpos, ypos;
 		glfwGetCursorPos(window, &xpos, &ypos);
 		AddParticle(particles, xpos, ypos);
@@ -118,9 +117,9 @@ void applyForces() {
 }
 
 void CheckCollision(int j ,int i) {
-	glm::vec2 axis = { particles[i].curr.x - particles[j].curr.x, particles[i].curr.y - particles[j].curr.y };
+	vec2 axis = particles[i].curr - particles[j].curr;
 	GLfloat dist = sqrt(axis.x * axis.x + axis.y * axis.y);
-	glm::vec2 norm;
+	vec2 norm;
 	if (i != j) {
 		if (dist < RADIUS * 2) {
 			norm = { axis.x / dist, axis.y / dist };
@@ -134,32 +133,32 @@ void CheckCollision(int j ,int i) {
 				particles[i].curr += norm;
 				particles[j].curr -= norm;
 
-				//when they spawn in each other they have a lot of velocity for some reason
+				//when they spawn in each other they have a lot of velocity
 			}
 			else {
-				glm::vec2 displacement = particles[i].curr - particles[i].prev;
+				vec2 displacement = particles[i].curr - particles[i].prev;
 				particles[i].curr += norm;
 				particles[j].curr -= norm;
 				particles[i].prev += displacement * 0.05f;
 				particles[j].prev -= displacement * 0.05f;
 			}
-
 		}
 	}
 }
 
-
 int getCellKey(int x, int y) {
 	int col = (x / CELL_SIZE);
 	int row = (int)(y / CELL_SIZE);
-	int hash = GetHashIndex(col, row) % NUM_PARTICLES;
+	int hash = GetHashIndex(col, row) % NUM_PARTICLES;//maybe can recalculating is slow
 	return hash;
+	//make this take in a particle, use the particle index as the index to the hash and then just get the hash when getting cell particles
 }
 
 void AssignCell(const Particle& p, int i) {
 	int x = p.curr.x / CELL_SIZE;
 	int y = p.curr.y / CELL_SIZE;
 	int hash = GetHashIndex(x, y) % NUM_PARTICLES;
+	//hashes[i] = hash;
 	Tuple t;
 	t.hId = hash;
 	t.pId = i;
@@ -170,8 +169,8 @@ void PopulateGrid() {
 	for (int i = 0; i < NUM_PARTICLES; i++) {
 		AssignCell(particles[i], i);
 	}
-	
-	sort(cellLookup, cellLookup + NUM_PARTICLES);
+	//sorting slows down by a few frames, not sure if there are any better alternatives
+	sort(cellLookup, cellLookup + NUM_PARTICLES);  
 	fill_n(groupIndices, NUM_PARTICLES, -1);
 	int prev = -1;
 	for (int i = 0; i < NUM_PARTICLES; i++) {
@@ -187,8 +186,6 @@ void GetCellParticles(int x, int y, int i) {
 	int pos = groupIndices[cellKey];
 
 	int prev = cellLookup[pos].hId;
-
-	vector<int> cellNeighbors;
 	if (pos == -1) {
 		return;
 	}
@@ -241,6 +238,73 @@ void HandleCollisions() {
 		int x = particles[i].curr.x;
 		int y = particles[i].curr.y;
 		GetCellParticles(x, y, i);
+		if (x - CELL_SIZE >= 0) {
+			GetCellParticles(x - CELL_SIZE, y, i);
+		}
+		if (x + CELL_SIZE <= WIDTH) {
+			GetCellParticles(x + CELL_SIZE, y, i);
+		}
+		if (y - CELL_SIZE >= 0) {
+			GetCellParticles(x, y - CELL_SIZE, i);
+		}
+		if (y + CELL_SIZE <= HEIGHT) {
+			GetCellParticles(x, y + CELL_SIZE, i);
+		}
+		if (x + CELL_SIZE <= WIDTH && y + CELL_SIZE <= HEIGHT) {
+			GetCellParticles(x + CELL_SIZE, y + CELL_SIZE, i);
+		}
+		if (x + CELL_SIZE <= WIDTH && y - CELL_SIZE >= 0) {
+			GetCellParticles(x + CELL_SIZE, y - CELL_SIZE, i);
+		}
+		if (x - CELL_SIZE >= 0 && y - CELL_SIZE >= 0) {
+			GetCellParticles(x - CELL_SIZE, y - CELL_SIZE, i);
+		}
+		if (x - CELL_SIZE >= 0 && y + CELL_SIZE <= HEIGHT) {
+			GetCellParticles(x - CELL_SIZE, y + CELL_SIZE, i);
+		}
+		
+	}
+}
+
+void SeparatedCollisions(int start, int end) {
+	for (int i = start; i < end; i++) {
+		int x = particles[i].curr.x;
+		int y = particles[i].curr.y;
+		GetCellParticles(x, y, i);
+		if (x - CELL_SIZE >= 0) {
+			GetCellParticles(x - CELL_SIZE, y, i);
+		}
+		if (x + CELL_SIZE <= WIDTH) {
+			GetCellParticles(x + CELL_SIZE, y, i);
+		}
+		if (y - CELL_SIZE >= 0) {
+			GetCellParticles(x, y - CELL_SIZE, i);
+		}
+		if (y + CELL_SIZE <= HEIGHT) {
+			GetCellParticles(x, y + CELL_SIZE, i);
+		}
+		if (x + CELL_SIZE <= WIDTH && y + CELL_SIZE <= HEIGHT) {
+			GetCellParticles(x + CELL_SIZE, y + CELL_SIZE, i);
+		}
+		if (x + CELL_SIZE <= WIDTH && y - CELL_SIZE >= 0) {
+			GetCellParticles(x + CELL_SIZE, y - CELL_SIZE, i);
+		}
+		if (x - CELL_SIZE >= 0 && y - CELL_SIZE >= 0) {
+			GetCellParticles(x - CELL_SIZE, y - CELL_SIZE, i);
+		}
+		if (x - CELL_SIZE >= 0 && y + CELL_SIZE <= HEIGHT) {
+			GetCellParticles(x - CELL_SIZE, y + CELL_SIZE, i);
+		}
+
+	}
+}
+
+void ThreadedCollisions(int col, int xCellStart, int xCellEnd) {
+	col *= CELL_SIZE;
+	for (int i = 0; i < NUM_CELLS_Y; i++) {
+		int x = col;
+		int y = CELL_SIZE * i;
+		GetCellParticles(x, y, i);
 		GetCellParticles(x - CELL_SIZE, y, i);
 		GetCellParticles(x + CELL_SIZE, y, i);
 		GetCellParticles(x, y - CELL_SIZE, i);
@@ -252,13 +316,31 @@ void HandleCollisions() {
 	}
 }
 
+void HandleThreadedCollisions() {
+	vector<thread> threads;
+	int incr = NUM_PARTICLES / NUM_THREADS;
+	int start = 0;
+	int end = incr;
+	for (int i = 0; i < 1; i++) {
+		threads.push_back(thread(SeparatedCollisions,start, end));
+		start += incr;
+		end += incr;
+	}
+	//threads.push_back(thread(SeparatedCollisions, end, NUM_PARTICLES));
+	for (thread& t : threads) {
+		if (t.joinable()) {
+			t.join();
+		}
+	}
+	
+}
+
 void updatePositions() {
 
 	for (int i = 0; i < NUM_PARTICLES; i++) {
-		glm::vec2 displacement = particles[i].curr - particles[i].prev;
+		vec2 displacement = particles[i].curr - particles[i].prev;
 		particles[i].prev = particles[i].curr;
 		particles[i].acc *= TIME_STEP * TIME_STEP;
-		//cout << particles[i].acc.x << endl;
 		particles[i].curr += displacement + particles[i].acc;
 		particles[i].acc = {};
 	}
@@ -266,41 +348,36 @@ void updatePositions() {
 
 void checkBounds() {
 	for (int i = 0; i < NUM_PARTICLES; i++) {
-		//IF THE WALLS ARE BEING WEIRD GET RID OF .PREV MODIFICATIONS
-		glm::vec2 displacement;
+		vec2 displacement;
 		if (particles[i].curr.y + RADIUS >= HEIGHT) {
-			glm::vec2 displacement = particles[i].curr - particles[i].prev;
+			vec2 displacement = particles[i].curr - particles[i].prev;
 			particles[i].curr.y = HEIGHT - RADIUS;
-			//particles[i].prev.y = particles[i].curr.y + displacement.y * 0.9f;
 
 		}
 		if (particles[i].curr.y - RADIUS <= 0) {
-			glm::vec2 displacement = particles[i].curr - particles[i].prev;
+			vec2 displacement = particles[i].curr - particles[i].prev;
 			particles[i].curr.y = RADIUS;
 		}
 
 		if (particles[i].curr.x + RADIUS >= WIDTH) {
-			glm::vec2 displacement = particles[i].curr - particles[i].prev;
+			vec2 displacement = particles[i].curr - particles[i].prev;
 			particles[i].curr.x = WIDTH - RADIUS;
 
 		}
 		if (particles[i].curr.x - RADIUS <= 0) {
-			glm::vec2 displacement = particles[i].curr - particles[i].prev;
+			vec2 displacement = particles[i].curr - particles[i].prev;
 			particles[i].curr.x = RADIUS;
 		}
 	}
 }
 
 void Update(GLFWwindow* window) {
-	//check fps
 	if (finalTime2 - initTime2 >= 1.0) {
 		int fps = frames2;
 		string f = "FPS: " + to_string(fps);
 		const char* str_fps = (f).c_str();
-		// I dont think this is correct
 		glfwSetWindowTitle(window, str_fps);
 
-		//check particles lost
 		particleInvariantCheck();
 		frames2 = 0;
 		initTime2 = glfwGetTime();
@@ -309,9 +386,8 @@ void Update(GLFWwindow* window) {
 		for (int i = 0; i < NUM_SUBSTEPS; i++) {
 			PopulateGrid();
 			applyForces();
-			//BruteForceCollisionCheck();
 			HandleCollisions();
-			checkBounds();
+			//HandleThreadedCollisions();
 			updatePositions();
 			checkBounds();
 
@@ -319,9 +395,8 @@ void Update(GLFWwindow* window) {
 		initTime = glfwGetTime();
 		frames2++;
 	}
-
-
 }
+
 
 void BeginSim() {
 	//create window
@@ -333,9 +408,6 @@ void BeginSim() {
 
 	//TODO: make a mesh instead the size of the particles doesnt change with the 
 	// size of the window
-
-	//generate particles
-	//vector<Particle> particles;
 	int n = (SEGMENTS * 3) + 3;
 	
 
@@ -344,56 +416,51 @@ void BeginSim() {
 
 	glfwSwapBuffers(window);
 
-	GLuint* VAO = new GLuint[MAX_PARTICLES];
-	GLuint* VBO = new GLuint[MAX_PARTICLES];
-	GLuint* EBO = new GLuint[MAX_PARTICLES];
+	GLuint VAO, VBO, EBO;
+	//Generate Particles
+	GLfloat* vertices = new GLfloat[n];
+	GLuint* EBOIndices = new GLuint[n];
+	GenerateParticle(vertices, EBOIndices, n);
+
 	MakeParticleGrid(particles);
 	MakeExtraParticles(particles);
-	for (int i = 0; i < MAX_PARTICLES; i++) {
-		GLuint* buffers = CreateBuffers(particles[i].vertices, particles[i].EBOIndices, n);
-		VAO[i] = buffers[0], VBO[i] = buffers[1], EBO[i] = buffers[2];
-	}
+
+	GLuint* buffers = CreateBuffers(vertices, EBOIndices, n);
+	VAO = buffers[0], VBO = buffers[1], EBO = buffers[2];
+
 	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	int modelLoc = glGetUniformLocation(shader.shaderID, "model");
 	int projLoc = glGetUniformLocation(shader.shaderID, "proj");
 	int ColorLoc = glGetUniformLocation(shader.shaderID, "color");
 
-	glm::mat4 proj = glm::mat4(1.0f);
-	proj = glm::ortho(0.0f, (float)WIDTH, (float)HEIGHT, 0.0f, -1.0f, 1.0f);
+	mat4 proj = glm::mat4(1.0f);
+	proj = ortho(0.0f, (float)WIDTH, (float)HEIGHT, 0.0f, -1.0f, 1.0f);
 
 	initTime = glfwGetTime();
 	initTime2 = glfwGetTime();
 
 	for (int i = 0; i < NUM_PARTICLES; i++) {
-		densities.push_back(0.0f);
-		nearDensities.push_back(0.0f);
+		densities[i] = 0.0f;
+		nearDensities[i] = 0.0f;
 	}
 
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
-
+	shader.useShader();
 	while (!glfwWindowShouldClose(window)) {
 		bool nextFrame = processInput(window);
-		shader.useShader();
 		if (!pause) {
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 			for (int i = 0; i < NUM_PARTICLES; i++) {
-				glBindVertexArray(VAO[i]);
-				glBindBuffer(GL_ARRAY_BUFFER, VBO[i]);
-
 				glm::mat4 model = glm::mat4(1.0f);
 				model = glm::translate(model, glm::vec3(particles[i].curr.x, particles[i].curr.y, 0.0f));
 				float distance = GetParticleDistance(particles[i]);
 				glUniform4f(ColorLoc, distance/10.0f, 0.0f, 10.0f / (distance), 1.0f);
 				glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 				glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(proj));
-				
-				glBufferData(GL_ARRAY_BUFFER, n * sizeof(GLfloat), particles[i].vertices, GL_STATIC_DRAW);
-
-				glDrawElements(GL_TRIANGLES, n, GL_UNSIGNED_INT, 0);
+				//glBufferData(GL_ARRAY_BUFFER, n * sizeof(GLfloat), particles[i].vertices, GL_STATIC_DRAW);
+				glDrawElements(GL_TRIANGLES, n, GL_UNSIGNED_INT, 0); 
 			}
-
-			
 			if (nextFrame) {
 				finalTime = glfwGetTime();
 				finalTime2 = glfwGetTime();
@@ -401,33 +468,27 @@ void BeginSim() {
 			}
 			glfwSwapBuffers(window);
 		}
-
-
 		glfwPollEvents();
 	}
 
 	//TODO: RUN VALGRIND
 	//TODO: chemical reactions and stuff
 	//TODO: https://www.benrogers.dev/
-	//TOD): MAKE PARTICLES PUBLIC
-	for (int i = 0; i < NUM_PARTICLES; i++) {
-		glDeleteVertexArrays(1, &VAO[i]);
-		glDeleteBuffers(1, &VBO[i]);
-		glDeleteBuffers(1, &EBO[i]);
-	}
+	//TODO: make 3D separate FILE
+	///TODO: open second window and particles will flow into other window
+	//TODO: particles react with window shake
+	glDeleteVertexArrays(1, &VAO);
+	glDeleteBuffers(1, &VBO);
+	glDeleteBuffers(1, &EBO);
 	shader.Delete();
 	glfwDestroyWindow(window);
-	for (int i = 0; i < NUM_PARTICLES; i++) {
-		delete[] particles[i].EBOIndices;
-		delete[] particles[i].vertices;
-	}
 	glfwTerminate();
 	return;
 }
 
 int main() {
 	//Initialization
-	//srand(static_cast <unsigned> (time(0)));
+	srand(static_cast <unsigned> (time(0)));
 	glfwInit();
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);

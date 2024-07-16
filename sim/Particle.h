@@ -11,9 +11,7 @@ using namespace glm;
 
 
 struct Particle {
-	int size;
-	GLfloat* vertices;
-	GLuint* EBOIndices;
+	int size; //uh I should probably get rid of this?
 	vec2 acc;
 	vec2 prev;
 	vec2 curr;
@@ -34,26 +32,26 @@ float NearKernel(float dist) {
 	return (float)(pow(delta, 3) * (10.0f / (PI * pow(SMOOTHING_RADIUS, 5))));
 }
 
-vec2 CalculateDensity(vector<Particle>& particles, int pIndex) {
-	float density = 0.0f;
-	float nearDensity = 0.0f;
-	for (int i = 0; i < particles.size(); i++) {
-		if (i != pIndex) {
-			float dist = GetDistance(particles[i].curr, particles[pIndex].curr);
-			//cout << dist << endl;
-			if (dist <= SMOOTHING_RADIUS) {
-				density += MASS * DensityKernel(dist);
-				nearDensity += MASS * NearKernel(dist);
-			}
-			
-			
-		}
-			
-		
-	}
-	return vec2{density, nearDensity};
-	
-}
+//vec2 CalculateDensity(vector<Particle>& particles, int pIndex) {
+//	float density = 0.0f;
+//	float nearDensity = 0.0f;
+//	for (int i = 0; i < particles.size(); i++) {
+//		if (i != pIndex) {
+//			float dist = GetDistance(particles[i].curr, particles[pIndex].curr);
+//			//cout << dist << endl;
+//			if (dist <= SMOOTHING_RADIUS) {
+//				density += MASS * DensityKernel(dist);
+//				nearDensity += MASS * NearKernel(dist);
+//			}
+//			
+//			
+//		}
+//			
+//		
+//	}
+//	return vec2{density, nearDensity};
+//	
+//}
 
 float SmoothingSlope(float dist) {
 	if (0 > SMOOTHING_RADIUS - dist) { return 0; }
@@ -78,47 +76,47 @@ int randSign() {
 	return (float)pow(-1, rand() % 2);
 }
 
-vec2 CalculateForce1(vector<Particle>& particles, int pIndex) { //calc property
-	vec2 Totalpressure = {};
-	float density = densities[pIndex];
-	float nearDensity = nearDensities[pIndex];
-	float pressure = DensityToPressure(density);
-	float nearPressure = DensityToPressure(nearDensity);
-	for (int i = 0; i < particles.size(); i++) {
-		if (i != pIndex) {
-			vec2 direction;
-			float dist = GetDistance(particles[i].curr, particles[pIndex].curr);
-
-			if (dist == 0.0f) {
-				direction = { randSign(), randSign() };
-			}
-			else {
-				direction = (particles[i].curr - particles[pIndex].curr) / dist;
-			}
-			
-			
-			float slope = SmoothingSlope(dist);
-			float neighborDensity = densities[i];
-			float nearNeighborDensity = nearDensities[i];
-			float neighborPressure = DensityToPressure(neighborDensity);
-			float nearNeighborPressure = DensityToPressure(nearNeighborDensity);
-
-			float sharedPressure = ReturnPressure(pressure, neighborPressure);
-			float nearSharedPressure = ReturnPressure(nearPressure, nearNeighborPressure);
-			
-			if (density != 0 && neighborDensity != 0 && nearNeighborDensity != 0) {
-				
-
-				Totalpressure += direction * SmoothingSlope(dist) * sharedPressure / neighborDensity;
-				Totalpressure += direction * NearSmoothingSlope(dist) * nearSharedPressure / nearNeighborDensity;
-			}
-			
-		}
-		
-
-	}
-	return Totalpressure;
-}
+//vec2 CalculateForce1(partcke, int pIndex) { //calc property
+//	vec2 Totalpressure = {};
+//	float density = densities[pIndex];
+//	float nearDensity = nearDensities[pIndex];
+//	float pressure = DensityToPressure(density);
+//	float nearPressure = DensityToPressure(nearDensity);
+//	for (int i = 0; i < particles.size(); i++) {
+//		if (i != pIndex) {
+//			vec2 direction;
+//			float dist = GetDistance(particles[i].curr, particles[pIndex].curr);
+//
+//			if (dist == 0.0f) {
+//				direction = { randSign(), randSign() };
+//			}
+//			else {
+//				direction = (particles[i].curr - particles[pIndex].curr) / dist;
+//			}
+//			
+//			
+//			float slope = SmoothingSlope(dist);
+//			float neighborDensity = densities[i];
+//			float nearNeighborDensity = nearDensities[i];
+//			float neighborPressure = DensityToPressure(neighborDensity);
+//			float nearNeighborPressure = DensityToPressure(nearNeighborDensity);
+//
+//			float sharedPressure = ReturnPressure(pressure, neighborPressure);
+//			float nearSharedPressure = ReturnPressure(nearPressure, nearNeighborPressure);
+//			
+//			if (density != 0 && neighborDensity != 0 && nearNeighborDensity != 0) {
+//				
+//
+//				Totalpressure += direction * SmoothingSlope(dist) * sharedPressure / neighborDensity;
+//				Totalpressure += direction * NearSmoothingSlope(dist) * nearSharedPressure / nearNeighborDensity;
+//			}
+//			
+//		}
+//		
+//
+//	}
+//	return Totalpressure;
+//}
 
 void GenerateParticle(GLfloat*& vertices, GLuint*& EBOIndices, int n) {
 	vertices[0] = 0.0;
@@ -155,7 +153,7 @@ void GenerateParticle(GLfloat*& vertices, GLuint*& EBOIndices, int n) {
 	EBOIndices[i] = curr;
 }
 
-void MakeParticleGrid(vector<Particle>& particles) {
+void MakeParticleGrid(Particle particles[]) {
 	int n = (SEGMENTS * 3) + 3;
 	int j = 0;
 	int i = 0;
@@ -168,11 +166,6 @@ void MakeParticleGrid(vector<Particle>& particles) {
 			i = 0;
 		}
 		Particle c;
-		GLfloat* vertices = new GLfloat[n];
-		GLuint* EBOIndices = new GLuint[n];
-		GenerateParticle(vertices, EBOIndices, n);
-		c.EBOIndices = EBOIndices;
-		c.vertices = vertices;
 		c.size = n;
 		c.curr.x = RADIUS * 2 + i * RADIUS * 3;
 		c.curr.y = RADIUS + j * RADIUS * 3;
@@ -180,7 +173,7 @@ void MakeParticleGrid(vector<Particle>& particles) {
 		c.prev.x = c.curr.x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (1))) * pow(-1, rand() % 2);
 		c.acc.x = 0;
 		c.acc.y = 0;
-		particles.push_back(c);
+		particles[counter] = c;
 		i++;
 		counter++;
 		
@@ -213,17 +206,12 @@ GLuint* CreateBuffers(GLfloat*& vertices, GLuint*& EBOIndices, int n) {
 	return buffers;
 }
 
-void MakeExtraParticles(vector<Particle>& particles) {
+void MakeExtraParticles(Particle particles[]) {
 	int i = NUM_PARTICLES;
 	int n = (SEGMENTS * 3) + 3;
 	
 	while(i < MAX_PARTICLES) {
 		Particle c;
-		GLfloat* vertices = new GLfloat[n];
-		GLuint* EBOIndices = new GLuint[n];
-		GenerateParticle(vertices, EBOIndices, n);
-		c.EBOIndices = EBOIndices;
-		c.vertices = vertices;
 		c.size = n;
 		c.curr.x = 0;
 		c.curr.y = 0;
@@ -231,13 +219,13 @@ void MakeExtraParticles(vector<Particle>& particles) {
 		c.prev.x = 0;
 		c.acc.x = 0;
 		c.acc.y = 0;
-		particles.push_back(c);
+		particles[i] = c;
 		i++;
 
 	}
 }
 
-void AddParticle(vector<Particle>& particles, double xpos, double ypos) {
+void AddParticle(Particle particles[], double xpos, double ypos) {
 	int n = (SEGMENTS * 3) + 3;
 
 	if (NUM_PARTICLES < MAX_PARTICLES) {
