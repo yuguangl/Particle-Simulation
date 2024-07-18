@@ -13,6 +13,9 @@
 #include <algorithm>
 #include <stdlib.h>
 #include <thread>
+#include <functional>
+#include <future>
+#include <omp.h>
 
 #include "Variables.h"
 #include "Particle.h"
@@ -94,34 +97,26 @@ void particleInvariantCheck() {
 void applyForces() {
 	for (int i = 0; i < NUM_PARTICLES; i++) {
 		particles[i].acc.y = G / (float)NUM_SUBSTEPS;
-		//densities[i] = CalculateDensity(particles, i).x;
-		//nearDensities[i] = CalculateDensity(particles, i).y;
-
-		
-		//TODO: HELPER FUNCTION THAT DETECTS WHERE SCREEN CLICK AND FIND THE PARTICLE AT THAT POINT
-	}
-	for (int i = 0; i < NUM_PARTICLES; i++) {
-		//vec2 force = CalculateForce1(particles, i);
-		
-		/*if (densities[i] != 0) {
-			particles[i].acc += ((force / densities[i]));
-			if (fabs(particles[i].acc.y) > 500 || fabs(particles[i].acc.y) > 500) {
-				cout << "force: " << force.x << " " << force.y << endl;
-				cout << "density: " << densities[i] << endl;
-			}
-			
-		}*/
-		
-		
 	}
 }
 
-void CheckCollision(int j ,int i) {
+void CheckCollision(int j ,int i, int p = -1) {
 	vec2 axis = particles[i].curr - particles[j].curr;
 	GLfloat dist = sqrt(axis.x * axis.x + axis.y * axis.y);
 	vec2 norm;
 	if (i != j) {
 		if (dist < RADIUS * 2) {
+			//cout << p << endl;
+			/*cout << "COLLISION DETECTED BETWEEN ID " << i << " and " << j << endl;
+			cout <<"and: " << particles[j].curr.x << " " << particles[j].curr.y << endl;
+
+			cout << "---" << endl;
+			for (int j = 0; j < NUM_PARTICLES; j++) {
+				cout << "Particle at " << particles[j].curr.x << " " << particles[j].curr.y << endl;
+				cout << "hash: " << cellLookup[j].hId << endl;
+				cout << "index: " << cellLookup[j].pId << endl;
+			}*/
+
 			norm = { axis.x / dist, axis.y / dist };
 			GLfloat delta = (RADIUS * 2) - dist;
 			delta *= 0.75f;
@@ -142,14 +137,16 @@ void CheckCollision(int j ,int i) {
 				particles[i].prev += displacement * 0.05f;
 				particles[j].prev -= displacement * 0.05f;
 			}
+			
+
 		}
 	}
 }
 
 int getCellKey(int x, int y) {
-	int col = (x / CELL_SIZE);
-	int row = (int)(y / CELL_SIZE);
-	int hash = GetHashIndex(col, row) % NUM_PARTICLES;//maybe can recalculating is slow
+	x = (x / CELL_SIZE);
+	y = (y / CELL_SIZE);
+	int hash = x * NUM_CELLS_X + y;//GetHashIndex(col, row) % (NUM_CELLS_X * NUM_CELLS_Y);//% NUM_PARTICLES;//maybe can recalculating is slow
 	return hash;
 	//make this take in a particle, use the particle index as the index to the hash and then just get the hash when getting cell particles
 }
@@ -157,8 +154,8 @@ int getCellKey(int x, int y) {
 void AssignCell(const Particle& p, int i) {
 	int x = p.curr.x / CELL_SIZE;
 	int y = p.curr.y / CELL_SIZE;
-	int hash = GetHashIndex(x, y) % NUM_PARTICLES;
-	//hashes[i] = hash;
+	int hash = x * NUM_CELLS_X + y; //GetHashIndex(x, y) % (NUM_CELLS_X * NUM_CELLS_Y);// NUM_PARTICLES;
+	hashes[i] = hash;
 	Tuple t;
 	t.hId = hash;
 	t.pId = i;
@@ -181,20 +178,23 @@ void PopulateGrid() {
 	}
 }
 
-void GetCellParticles(int x, int y, int i) {
-	int cellKey = getCellKey(x, y);
+void GetCellParticles(int cellKey, int i) { //NEEDS TO BE RENAMED
+	if (cellKey > (NUM_CELLS_X * NUM_CELLS_Y)-1 || cellKey < 0) {
+		return;
+	}
 	int pos = groupIndices[cellKey];
-
 	int prev = cellLookup[pos].hId;
 	if (pos == -1) {
 		return;
 	}
 	while (prev == cellLookup[pos].hId && pos < NUM_PARTICLES) {
-		CheckCollision(cellLookup[pos].pId, i);
+		CheckCollision(cellLookup[pos].pId, i, cellKey);
 		pos++;
 	}
 	
 }
+
+
 
 void BruteForceCollisionCheck() {
 	for (int i = 0; i < NUM_PARTICLES; i++) {
@@ -237,103 +237,19 @@ void HandleCollisions() {
 	for (int i = 0; i < NUM_PARTICLES; i++) {
 		int x = particles[i].curr.x;
 		int y = particles[i].curr.y;
-		GetCellParticles(x, y, i);
-		if (x - CELL_SIZE >= 0) {
-			GetCellParticles(x - CELL_SIZE, y, i);
-		}
-		if (x + CELL_SIZE <= WIDTH) {
-			GetCellParticles(x + CELL_SIZE, y, i);
-		}
-		if (y - CELL_SIZE >= 0) {
-			GetCellParticles(x, y - CELL_SIZE, i);
-		}
-		if (y + CELL_SIZE <= HEIGHT) {
-			GetCellParticles(x, y + CELL_SIZE, i);
-		}
-		if (x + CELL_SIZE <= WIDTH && y + CELL_SIZE <= HEIGHT) {
-			GetCellParticles(x + CELL_SIZE, y + CELL_SIZE, i);
-		}
-		if (x + CELL_SIZE <= WIDTH && y - CELL_SIZE >= 0) {
-			GetCellParticles(x + CELL_SIZE, y - CELL_SIZE, i);
-		}
-		if (x - CELL_SIZE >= 0 && y - CELL_SIZE >= 0) {
-			GetCellParticles(x - CELL_SIZE, y - CELL_SIZE, i);
-		}
-		if (x - CELL_SIZE >= 0 && y + CELL_SIZE <= HEIGHT) {
-			GetCellParticles(x - CELL_SIZE, y + CELL_SIZE, i);
-		}
-		
+		int key = getCellKey(x,y );
+		GetCellParticles(key, i);
+		GetCellParticles(key-1, i);
+		GetCellParticles(key + 1, i);
+		GetCellParticles(key - NUM_CELLS_X, i);
+		GetCellParticles(key + NUM_CELLS_X, i);
+		GetCellParticles(key + NUM_CELLS_X + 1, i);
+		GetCellParticles(key + NUM_CELLS_X - 1, i);
+		GetCellParticles(key - NUM_CELLS_X + 1, i);
+		GetCellParticles(key - NUM_CELLS_X - 1, i);
 	}
 }
 
-void SeparatedCollisions(int start, int end) {
-	for (int i = start; i < end; i++) {
-		int x = particles[i].curr.x;
-		int y = particles[i].curr.y;
-		GetCellParticles(x, y, i);
-		if (x - CELL_SIZE >= 0) {
-			GetCellParticles(x - CELL_SIZE, y, i);
-		}
-		if (x + CELL_SIZE <= WIDTH) {
-			GetCellParticles(x + CELL_SIZE, y, i);
-		}
-		if (y - CELL_SIZE >= 0) {
-			GetCellParticles(x, y - CELL_SIZE, i);
-		}
-		if (y + CELL_SIZE <= HEIGHT) {
-			GetCellParticles(x, y + CELL_SIZE, i);
-		}
-		if (x + CELL_SIZE <= WIDTH && y + CELL_SIZE <= HEIGHT) {
-			GetCellParticles(x + CELL_SIZE, y + CELL_SIZE, i);
-		}
-		if (x + CELL_SIZE <= WIDTH && y - CELL_SIZE >= 0) {
-			GetCellParticles(x + CELL_SIZE, y - CELL_SIZE, i);
-		}
-		if (x - CELL_SIZE >= 0 && y - CELL_SIZE >= 0) {
-			GetCellParticles(x - CELL_SIZE, y - CELL_SIZE, i);
-		}
-		if (x - CELL_SIZE >= 0 && y + CELL_SIZE <= HEIGHT) {
-			GetCellParticles(x - CELL_SIZE, y + CELL_SIZE, i);
-		}
-
-	}
-}
-
-void ThreadedCollisions(int col, int xCellStart, int xCellEnd) {
-	col *= CELL_SIZE;
-	for (int i = 0; i < NUM_CELLS_Y; i++) {
-		int x = col;
-		int y = CELL_SIZE * i;
-		GetCellParticles(x, y, i);
-		GetCellParticles(x - CELL_SIZE, y, i);
-		GetCellParticles(x + CELL_SIZE, y, i);
-		GetCellParticles(x, y - CELL_SIZE, i);
-		GetCellParticles(x, y + CELL_SIZE, i);
-		GetCellParticles(x + CELL_SIZE, y + CELL_SIZE, i);
-		GetCellParticles(x + CELL_SIZE, y - CELL_SIZE, i);
-		GetCellParticles(x - CELL_SIZE, y - CELL_SIZE, i);
-		GetCellParticles(x - CELL_SIZE, y + CELL_SIZE, i);
-	}
-}
-
-void HandleThreadedCollisions() {
-	vector<thread> threads;
-	int incr = NUM_PARTICLES / NUM_THREADS;
-	int start = 0;
-	int end = incr;
-	for (int i = 0; i < 1; i++) {
-		threads.push_back(thread(SeparatedCollisions,start, end));
-		start += incr;
-		end += incr;
-	}
-	//threads.push_back(thread(SeparatedCollisions, end, NUM_PARTICLES));
-	for (thread& t : threads) {
-		if (t.joinable()) {
-			t.join();
-		}
-	}
-	
-}
 
 void updatePositions() {
 
@@ -387,7 +303,6 @@ void Update(GLFWwindow* window) {
 			PopulateGrid();
 			applyForces();
 			HandleCollisions();
-			//HandleThreadedCollisions();
 			updatePositions();
 			checkBounds();
 
@@ -458,7 +373,6 @@ void BeginSim() {
 				glUniform4f(ColorLoc, distance/10.0f, 0.0f, 10.0f / (distance), 1.0f);
 				glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 				glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(proj));
-				//glBufferData(GL_ARRAY_BUFFER, n * sizeof(GLfloat), particles[i].vertices, GL_STATIC_DRAW);
 				glDrawElements(GL_TRIANGLES, n, GL_UNSIGNED_INT, 0); 
 			}
 			if (nextFrame) {

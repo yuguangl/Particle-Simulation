@@ -150,6 +150,7 @@
     <ClInclude Include="Boundry.h" />
     <ClInclude Include="Particle.h" />
     <ClInclude Include="Shader.h" />
+    <ClInclude Include="ThreadPool.h" />
     <ClInclude Include="Utils.h" />
   </ItemGroup>
   <ItemGroup>

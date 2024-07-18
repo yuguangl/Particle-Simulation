@@ -21,7 +21,7 @@ using namespace std;
 
 #define PI 3.1415926535897932384626433
 #define SEGMENTS 20 // just dont go over 90 for some reason
-#define RADIUS 7 // <= 1
+#define RADIUS 4 // >= 4 for some reason
 #define WIDTH 1200
 #define HEIGHT 1200
 #define TARGET_FPS 70
@@ -31,15 +31,15 @@ using namespace std;
 #define SUBSTEP (TIME_STEP/NUM_SUBSTEPS)
 #define SMOOTHING_RADIUS (RADIUS*8)
 #define CELL_SIZE (RADIUS* 2)
-#define NUM_CELLS_X ceil(WIDTH/CELL_SIZE)
-#define NUM_CELLS_Y ceil(HEIGHT/CELL_SIZE)
+#define NUM_CELLS_X (int)ceil(WIDTH/CELL_SIZE)
+#define NUM_CELLS_Y (int)ceil(HEIGHT/CELL_SIZE)
 #define MASS 1
 #define PRESSUREC 100.0f
-#define MAX_PARTICLES 10000
-#define NUM_THREADS 4
+#define MAX_PARTICLES 20000
+#define NUM_THREADS 2
 
 //globals
-int NUM_PARTICLES = 2000;
+int NUM_PARTICLES = 4000; //id theres no particles it breaks
 bool pause = false; //obvious
 double prevTime = 0; // used to make sure button presses work properly
 double timeOffset = 0;//used to offset time after pause

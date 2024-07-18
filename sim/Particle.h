@@ -170,7 +170,7 @@ void MakeParticleGrid(Particle particles[]) {
 		c.curr.x = RADIUS * 2 + i * RADIUS * 3;
 		c.curr.y = RADIUS + j * RADIUS * 3;
 		c.prev.y = c.curr.y; //+ static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (10))) * pow(-1, rand() % 2);;
-		c.prev.x = c.curr.x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (1))) * pow(-1, rand() % 2);
+		c.prev.x = c.curr.x;//+ static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (1))) * pow(-1, rand() % 2);
 		c.acc.x = 0;
 		c.acc.y = 0;
 		particles[counter] = c;
