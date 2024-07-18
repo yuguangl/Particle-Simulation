@@ -1,4 +1,4 @@
-# 2D Particle Simulation 
+#                          2D Particle Simulation 
 
 <p align="center">
 Made using C++ and OpenGL
