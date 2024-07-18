@@ -1,7 +1,7 @@
-<p align="center">
 # 2D Particle Simulation 
-Made using C++ and OpenGL
 
+<p align="center">
+Made using C++ and OpenGL
 </p>
 <p align="center">
   <img src="https://github.com/user-attachments/assets/6c95d101-726b-4080-abda-5d9dd5458edb" alt=""/>
