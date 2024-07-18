@@ -5,7 +5,7 @@
 
 
 <p align="center">
-  <img src="![imagee (3)](https://github.com/user-attachments/assets/8d9b1257-3759-47a8-ac7d-5e4a3ba0b842)" alt=""/>
+  <img src="https://github.com/user-attachments/assets/8d9b1257-3759-47a8-ac7d-5e4a3ba0b842" alt=""/>
 </p>
 
 
