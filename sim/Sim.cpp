@@ -16,6 +16,8 @@
 #include <functional>
 #include <future>
 #include <omp.h>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/string_cast.hpp>
 
 #include "Variables.h"
 #include "Particle.h"
@@ -99,24 +101,13 @@ void applyForces() {
 		particles[i].acc.y = G / (float)NUM_SUBSTEPS;
 	}
 }
-
-void CheckCollision(int j ,int i, int p = -1) {
-	vec2 axis = particles[i].curr - particles[j].curr;
+static mutex m;
+void CheckCollision(int j ,int i) {
+	vec2 axis = { particles[i].curr.x - particles[j].curr.x, particles[i].curr.y - particles[j].curr.y };
 	GLfloat dist = sqrt(axis.x * axis.x + axis.y * axis.y);
 	vec2 norm;
 	if (i != j) {
 		if (dist < RADIUS * 2) {
-			//cout << p << endl;
-			/*cout << "COLLISION DETECTED BETWEEN ID " << i << " and " << j << endl;
-			cout <<"and: " << particles[j].curr.x << " " << particles[j].curr.y << endl;
-
-			cout << "---" << endl;
-			for (int j = 0; j < NUM_PARTICLES; j++) {
-				cout << "Particle at " << particles[j].curr.x << " " << particles[j].curr.y << endl;
-				cout << "hash: " << cellLookup[j].hId << endl;
-				cout << "index: " << cellLookup[j].pId << endl;
-			}*/
-
 			norm = { axis.x / dist, axis.y / dist };
 			GLfloat delta = (RADIUS * 2) - dist;
 			delta *= 0.75f;
@@ -125,6 +116,7 @@ void CheckCollision(int j ,int i, int p = -1) {
 				int angle = rand() % 361;
 				norm.x = cos(angle) * RADIUS;
 				norm.y = sin(angle) * RADIUS;
+				//lock_guard<mutex> lock(m);
 				particles[i].curr += norm;
 				particles[j].curr -= norm;
 
@@ -132,6 +124,7 @@ void CheckCollision(int j ,int i, int p = -1) {
 			}
 			else {
 				vec2 displacement = particles[i].curr - particles[i].prev;
+				//lock_guard<mutex> lock(m);
 				particles[i].curr += norm;
 				particles[j].curr -= norm;
 				particles[i].prev += displacement * 0.05f;
@@ -142,6 +135,7 @@ void CheckCollision(int j ,int i, int p = -1) {
 		}
 	}
 }
+
 
 int getCellKey(int x, int y) {
 	x = (x / CELL_SIZE);
@@ -188,7 +182,7 @@ void GetCellParticles(int cellKey, int i) { //NEEDS TO BE RENAMED
 		return;
 	}
 	while (prev == cellLookup[pos].hId && pos < NUM_PARTICLES) {
-		CheckCollision(cellLookup[pos].pId, i, cellKey);
+		CheckCollision(cellLookup[pos].pId, i);
 		pos++;
 	}
 	
@@ -231,7 +225,48 @@ void BruteForceCollisionCheck() {
 	}
 }
 
+void AsyncFunction(int start, int end) {
+	for (int i = start; i < end; i++) {
+		int x = particles[i].curr.x;
+		int y = particles[i].curr.y;
+		int key = getCellKey(x, y);
+		GetCellParticles(key, i);
+		GetCellParticles(key - 1, i);
+		GetCellParticles(key + 1, i);
+		GetCellParticles(key - NUM_CELLS_X, i);
+		GetCellParticles(key + NUM_CELLS_X, i);
+		GetCellParticles(key + NUM_CELLS_X + 1, i);
+		GetCellParticles(key + NUM_CELLS_X - 1, i);
+		GetCellParticles(key - NUM_CELLS_X + 1, i);
+		GetCellParticles(key - NUM_CELLS_X - 1, i);
+	}
+}
+//vector<thread> threads;
+//void createThread(int start, int end) {
+//	threads.push_back(thread(AsyncFunction, start, end));
+//	for (thread& t : threads) {
+//		t.join();
+//	}
+//}
 
+
+void ThreadedCollisions() {
+	future<void> futures[NUM_THREADS];
+	thread threads[NUM_THREADS];
+	int start = 0;
+	int incr = NUM_PARTICLES / NUM_THREADS;
+	int end = incr;
+	for (int i = 0; i < NUM_THREADS; i++) {
+		//futures[i] = async(launch::async, createThread, start, end);
+		futures[i] = (async(launch::async, AsyncFunction, start, end));
+		//threads[i] = thread(AsyncFunction, start, end);
+		start += incr;
+		end += incr;
+	}
+	/*for(thread & t : threads) {
+		t.join();
+	}*/
+}
 
 void HandleCollisions() {
 	for (int i = 0; i < NUM_PARTICLES; i++) {
@@ -303,6 +338,7 @@ void Update(GLFWwindow* window) {
 			PopulateGrid();
 			applyForces();
 			HandleCollisions();
+			//ThreadedCollisions();
 			updatePositions();
 			checkBounds();
 
@@ -367,10 +403,13 @@ void BeginSim() {
 		if (!pause) {
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 			for (int i = 0; i < NUM_PARTICLES; i++) {
-				glm::mat4 model = glm::mat4(1.0f);
-				model = glm::translate(model, glm::vec3(particles[i].curr.x, particles[i].curr.y, 0.0f));
+				glm::mat4 model = glm::mat4(
+					1.0f, 0.0f, 0.0f, 0.0f,
+					0.0f, 1.0f, 0.0f, 0.0f,
+					0.0f, 0.0f, 1.0f, 0.0f, 
+					particles[i].curr.x, particles[i].curr.y, 0.0f, 1.0f);
 				float distance = GetParticleDistance(particles[i]);
-				glUniform4f(ColorLoc, distance/10.0f, 0.0f, 10.0f / (distance), 1.0f);
+				glUniform4f(ColorLoc, distance/5.0f, 0.0f, 5.0f / (distance), 1.0f);
 				glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 				glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(proj));
 				glDrawElements(GL_TRIANGLES, n, GL_UNSIGNED_INT, 0); 
