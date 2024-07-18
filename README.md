@@ -1,7 +1,7 @@
 2D particle simulation in C++ using OpenGL
 
 
-![Untitledvideo-MadewithClipchamp-ezgif com-crop](https://github.com/user-attachments/assets/6c95d101-726b-4080-abda-5d9dd5458edb)
+          ![Untitledvideo-MadewithClipchamp-ezgif com-crop](https://github.com/user-attachments/assets/6c95d101-726b-4080-abda-5d9dd5458edb)
 
 
 
