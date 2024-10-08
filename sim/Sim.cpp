@@ -27,15 +27,27 @@
 
 Particle particles[MAX_PARTICLES];
 
+float SmoothingSlope(float dist) {
+	//if (dist > SMOOTHING_RADIUS) { return 0; }
+	//return (1.0f / 4.0f) * (float)pow((2.0f - (dist / SMOOTHING_RADIUS)), 3) / (float)(PI * pow(SMOOTHING_RADIUS, 3));
+	if (0 > SMOOTHING_RADIUS - dist) { return 0; }
+	return (float)((3 * pow(SMOOTHING_RADIUS - dist, 2) * (10.0f / pow(SMOOTHING_RADIUS, 5) * PI)));
+}
 
-void GetParticleDensity( double xpos, double ypos) {
-	//make this check the grid in the future
-	float density;
-	for (int i = 0; i < NUM_PARTICLES; i++) {
-		if (GetDistance(particles[i].curr, vec2{ xpos, ypos }) <= RADIUS) {
-			cout << i << " " << densities[i] << endl;
-		}
+float DensityKernel(float dist) {
+	/*
+	if (dist > 2 * SMOOTHING_RADIUS) {
+		return 0;
 	}
+	else if (dist >= SMOOTHING_RADIUS && dist <= 2 * SMOOTHING_RADIUS) {
+
+	}
+	*/
+	//if (dist > SMOOTHING_RADIUS) { return 0; }
+	//return (1 / 4) * pow((2 - (dist / SMOOTHING_RADIUS)), 3) / (PI * pow(SMOOTHING_RADIUS, 3));
+	float volume = (float)((PI * pow(SMOOTHING_RADIUS, 4)) / 6.0f);
+	if (SMOOTHING_RADIUS < dist) { return 0; }
+	return (float)((pow(SMOOTHING_RADIUS - dist, 2)) * (6.0f / (pow(SMOOTHING_RADIUS, 4) * PI))); // /volume
 }
 
 float GetParticleDistance(Particle p1) {
@@ -46,7 +58,6 @@ float GetParticleDistance(Particle p1) {
 vec2 CalcDisplacement(Particle p1) {
 	return p1.curr - p1.prev;
 }
-
 
 bool processInput(GLFWwindow* window) {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
@@ -62,12 +73,14 @@ bool processInput(GLFWwindow* window) {
 		}
 		pause = !pause;
 	}
-	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS && glfwGetTime() - prevTime > 0.02) {
+	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
 		double xpos, ypos;
 		glfwGetCursorPos(window, &xpos, &ypos);
-		AddParticle(particles, xpos, ypos);
-		//GetParticleDensity(particles, xpos, ypos);
+		mouseForce = true;
 		prevTime = glfwGetTime();
+	}
+	else {
+		mouseForce = false;
 	}
 	if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS && glfwGetTime() - prevTime > 0.1) {
 		prevTime = glfwGetTime();
@@ -96,12 +109,17 @@ void particleInvariantCheck() {
 	}
 }
 
-void applyForces() {
+void ApplyMouseForce(float xpos, float ypos) {
 	for (int i = 0; i < NUM_PARTICLES; i++) {
-		particles[i].acc.y = G / (float)NUM_SUBSTEPS;
+		vec2 diff = (particles[i].curr - vec2{ xpos,ypos });
+		particles[i].acc -= diff * 1.5f;
 	}
 }
+
+
+
 static mutex m;
+
 void CheckCollision(int j ,int i) {
 	vec2 axis = { particles[i].curr.x - particles[j].curr.x, particles[i].curr.y - particles[j].curr.y };
 	GLfloat dist = sqrt(axis.x * axis.x + axis.y * axis.y);
@@ -130,8 +148,6 @@ void CheckCollision(int j ,int i) {
 				particles[i].prev += displacement * 0.05f;
 				particles[j].prev -= displacement * 0.05f;
 			}
-			
-
 		}
 	}
 }
@@ -158,6 +174,7 @@ void AssignCell(const Particle& p, int i) {
 
 void PopulateGrid() {
 	for (int i = 0; i < NUM_PARTICLES; i++) {
+		particles[i].press = {};
 		AssignCell(particles[i], i);
 	}
 	//sorting slows down by a few frames, not sure if there are any better alternatives
@@ -172,19 +189,109 @@ void PopulateGrid() {
 	}
 }
 
-void GetCellParticles(int cellKey, int i) { //NEEDS TO BE RENAMED
+void CalculatePressure(int pId1, int pId2) {
+	if (pId1 != pId2) {
+		float dist = GetDistance(particles[pId1].curr, particles[pId2].curr);
+		vec2 direction = (particles[pId1].curr - particles[pId2].curr) / dist;
+		if (dist == 0.0f) {
+			direction = { randSign(), randSign() };
+		}
+		float neighborDensity = densities[pId2];
+		
+		float neighborPressure = DensityToPressure(neighborDensity);
+		vec2 pressure = vec2(1.0f, 1.0f) * (float)(MASS)*SmoothingSlope(dist) * neighborPressure / neighborDensity;
+		printf("->(%f, %d)",dist, SmoothingSlope(dist));
+		cout << endl <<  "density" << neighborDensity << endl;
+		cout << "neighborpressure" << neighborPressure << endl;
+		cout << "Direction" << to_string(direction) << endl;
+		
+		cout << "PRESSURE" << to_string(pressure) << endl;
+
+
+		
+		particles[pId1].press += pressure;
+	}
+	
+}
+
+
+//vec2 CalculateForce1(partcke, int pIndex) { //calc property
+//	vec2 Totalpressure = {};
+//	float density = densities[pIndex];
+//	float nearDensity = nearDensities[pIndex];
+//	float pressure = DensityToPressure(density);
+//	float nearPressure = DensityToPressure(nearDensity);
+//	for (int i = 0; i < particles.size(); i++) {
+//		if (i != pIndex) {
+//			vec2 direction;
+//			float dist = GetDistance(particles[i].curr, particles[pIndex].curr);
+//
+//			if (dist == 0.0f) {
+//				direction = { randSign(), randSign() };
+//			}
+//			else {
+//				direction = (particles[i].curr - particles[pIndex].curr) dist;
+//			}
+//			
+//			
+//			float slope = SmoothingSlope(dist);
+//			float neighborDensity = densities[i];
+//			float nearNeighborDensity = nearDensities[i];
+//			float neighborPressure = DensityToPressure(neighborDensity);
+//			float nearNeighborPressure = DensityToPressure(nearNeighborDensity);
+//
+//			float sharedPressure = ReturnPressure(pressure, neighborPressure);
+//			float nearSharedPressure = ReturnPressure(nearPressure, nearNeighborPressure);
+//			
+//			if (density != 0 && neighborDensity != 0 && nearNeighborDensity != 0) {
+//				
+//
+//				Totalpressure += direction * SmoothingSlope(dist) * sharedPressure / neighborDensity;
+//				Totalpressure += direction * NearSmoothingSlope(dist) * nearSharedPressure / nearNeighborDensity;
+//			}		
+//		}
+//	}
+//	return Totalpressure;
+//}
+
+void GetCellParticles(int cellKey, int i, int a=0) { //NEEDS TO BE RENAMED
+	//i is the particle comparing to.
+	
 	if (cellKey > (NUM_CELLS_X * NUM_CELLS_Y)-1 || cellKey < 0) {
 		return;
 	}
+	
 	int pos = groupIndices[cellKey];
 	int prev = cellLookup[pos].hId;
 	if (pos == -1) {
 		return;
 	}
+	//go through the the particles that have the same cellkey
+	//i think hId is hash id???
+	//and i think pId is the particles position in the array
 	while (prev == cellLookup[pos].hId && pos < NUM_PARTICLES) {
-		CheckCollision(cellLookup[pos].pId, i);
+		if (a == 1) {
+			//calculate densities
+			float dist = GetDistance(particles[cellLookup[pos].pId].curr, particles[i].curr);
+			if (cellLookup[pos].pId == i) {
+				densities[i] += MASS;
+			}
+			else {
+				densities[i] += SmoothingSlope(dist) * MASS;
+				//printf("Density %f", densities[i]);
+			}
+			
+		}
+		else if (a == 2) {
+			CalculatePressure(cellLookup[pos].pId, i);
+		}
+		else {
+			CheckCollision(cellLookup[pos].pId, i);
+		}
+		
 		pos++;
 	}
+	
 	
 }
 
@@ -218,7 +325,6 @@ void BruteForceCollisionCheck() {
 						particles[i].prev += displacement * 0.05f;
 						particles[j].prev -= displacement * 0.05f;
 					}
-
 				}
 			}
 		}
@@ -245,7 +351,7 @@ void AsyncFunction(int start, int end) {
 //void createThread(int start, int end) {
 //	threads.push_back(thread(AsyncFunction, start, end));
 //	for (thread& t : threads) {
-//		t.join();
+//		t.join()
 //	}
 //}
 
@@ -268,20 +374,29 @@ void ThreadedCollisions() {
 	}*/
 }
 
-void HandleCollisions() {
+void HandleCollisions(int a=0) {
 	for (int i = 0; i < NUM_PARTICLES; i++) {
 		int x = particles[i].curr.x;
 		int y = particles[i].curr.y;
-		int key = getCellKey(x,y );
-		GetCellParticles(key, i);
-		GetCellParticles(key-1, i);
-		GetCellParticles(key + 1, i);
-		GetCellParticles(key - NUM_CELLS_X, i);
-		GetCellParticles(key + NUM_CELLS_X, i);
-		GetCellParticles(key + NUM_CELLS_X + 1, i);
-		GetCellParticles(key + NUM_CELLS_X - 1, i);
-		GetCellParticles(key - NUM_CELLS_X + 1, i);
-		GetCellParticles(key - NUM_CELLS_X - 1, i);
+		int key = getCellKey(x,y);
+		GetCellParticles(key, i,a);
+		GetCellParticles(key-1, i,a);
+		GetCellParticles(key + 1, i,a);
+		GetCellParticles(key - NUM_CELLS_X, i,a);
+		GetCellParticles(key + NUM_CELLS_X, i,a);
+		GetCellParticles(key + NUM_CELLS_X + 1, i,a);
+		GetCellParticles(key + NUM_CELLS_X - 1, i,a);
+		GetCellParticles(key - NUM_CELLS_X + 1, i,a);
+		GetCellParticles(key - NUM_CELLS_X - 1, i,a);
+	}
+}
+
+void CalculateForces(Particle particles[MAX_PARTICLES]) {
+	HandleCollisions(1); //calculate densities
+	HandleCollisions(2);
+	for (int i = 0; i < NUM_PARTICLES; i++) {
+		//cout << to_string(particles[i].press);
+		particles[i].acc += particles[i].press;
 	}
 }
 
@@ -322,10 +437,24 @@ void checkBounds() {
 	}
 }
 
+void applyForces() {
+	for (int i = 0; i < NUM_PARTICLES; i++) {
+		particles[i].acc.y = G / (float)NUM_SUBSTEPS;
+		particles[i].acc.x = 0;
+		densities[i] = 0;
+	}
+	CalculateForces(particles);
+	if (mouseForce) {
+		double xpos, ypos;
+		glfwGetCursorPos(window, &xpos, &ypos);
+		ApplyMouseForce(xpos, ypos);
+	}
+}
+
 void Update(GLFWwindow* window) {
 	if (finalTime2 - initTime2 >= 1.0) {
 		int fps = frames2;
-		string f = "FPS: " + to_string(fps);
+		string f = "FPS: " + to_string(fps) + " Particle Count:" + to_string(NUM_PARTICLES);
 		const char* str_fps = (f).c_str();
 		glfwSetWindowTitle(window, str_fps);
 
@@ -351,10 +480,14 @@ void Update(GLFWwindow* window) {
 
 void BeginSim() {
 	//create window
-	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "Starting Simulation...", NULL, NULL);
+	window = glfwCreateWindow(WIDTH, HEIGHT, "Starting Simulation...", NULL, NULL);
 
 	glfwMakeContextCurrent(window);
 	gladLoadGL();
+
+	GLFWvidmode window_struct;
+
+
 	glViewport(0, 0, WIDTH, HEIGHT);
 
 	//TODO: make a mesh instead the size of the particles doesnt change with the 
@@ -409,7 +542,7 @@ void BeginSim() {
 					0.0f, 0.0f, 1.0f, 0.0f, 
 					particles[i].curr.x, particles[i].curr.y, 0.0f, 1.0f);
 				float distance = GetParticleDistance(particles[i]);
-				glUniform4f(ColorLoc, distance/5.0f, 0.0f, 5.0f / (distance), 1.0f);
+				glUniform4f(ColorLoc, distance / 5.0f, 0.0f, 5.0f / (distance), 1.0f);
 				glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 				glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(proj));
 				glDrawElements(GL_TRIANGLES, n, GL_UNSIGNED_INT, 0); 
@@ -423,13 +556,16 @@ void BeginSim() {
 		}
 		glfwPollEvents();
 	}
-
+	//TODO: write own matrices and vectors and multiplication
 	//TODO: RUN VALGRIND
 	//TODO: chemical reactions and stuff
 	//TODO: https://www.benrogers.dev/
 	//TODO: make 3D separate FILE
 	///TODO: open second window and particles will flow into other window
 	//TODO: particles react with window shake
+	//zoom in out/ around in 3d
+	//clean code up to have consistent naming schemes 
+	//as well as consistent naming of things between functions
 	glDeleteVertexArrays(1, &VAO);
 	glDeleteBuffers(1, &VBO);
 	glDeleteBuffers(1, &EBO);

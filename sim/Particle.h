@@ -15,17 +15,13 @@ struct Particle {
 	vec2 acc;
 	vec2 prev;
 	vec2 curr;
+	vec2 press;
 
 };
 
 
 
-float DensityKernel(float dist) {
-	
-	float volume = (float)((PI * pow(SMOOTHING_RADIUS, 4)) / 6.0f);
-	if (SMOOTHING_RADIUS < dist) { return 0; }
-	return (float)((pow(SMOOTHING_RADIUS - dist, 2)) * (6.0f / (pow(SMOOTHING_RADIUS, 4) * PI))); // /volume
-}
+
 
 float NearKernel(float dist) {
 	float delta = SMOOTHING_RADIUS - dist;
@@ -53,11 +49,7 @@ float NearKernel(float dist) {
 //	
 //}
 
-float SmoothingSlope(float dist) {
-	if (0 > SMOOTHING_RADIUS - dist) { return 0; }
-	return (float)((3 * pow(SMOOTHING_RADIUS - dist, 2) * (10.0f / pow(SMOOTHING_RADIUS, 5) * PI)));
-//	return -(10.0f * PI * pow(SMOOTHING_RADIUS - dist, 2) * (2 * SMOOTHING_RADIUS - 5 * dist) / pow(SMOOTHING_RADIUS, 6));
-}
+
 
 float NearSmoothingSlope(float dist) {
 	float delta = SMOOTHING_RADIUS - dist;
@@ -76,47 +68,9 @@ int randSign() {
 	return (float)pow(-1, rand() % 2);
 }
 
-//vec2 CalculateForce1(partcke, int pIndex) { //calc property
-//	vec2 Totalpressure = {};
-//	float density = densities[pIndex];
-//	float nearDensity = nearDensities[pIndex];
-//	float pressure = DensityToPressure(density);
-//	float nearPressure = DensityToPressure(nearDensity);
-//	for (int i = 0; i < particles.size(); i++) {
-//		if (i != pIndex) {
-//			vec2 direction;
-//			float dist = GetDistance(particles[i].curr, particles[pIndex].curr);
-//
-//			if (dist == 0.0f) {
-//				direction = { randSign(), randSign() };
-//			}
-//			else {
-//				direction = (particles[i].curr - particles[pIndex].curr) / dist;
-//			}
-//			
-//			
-//			float slope = SmoothingSlope(dist);
-//			float neighborDensity = densities[i];
-//			float nearNeighborDensity = nearDensities[i];
-//			float neighborPressure = DensityToPressure(neighborDensity);
-//			float nearNeighborPressure = DensityToPressure(nearNeighborDensity);
-//
-//			float sharedPressure = ReturnPressure(pressure, neighborPressure);
-//			float nearSharedPressure = ReturnPressure(nearPressure, nearNeighborPressure);
-//			
-//			if (density != 0 && neighborDensity != 0 && nearNeighborDensity != 0) {
-//				
-//
-//				Totalpressure += direction * SmoothingSlope(dist) * sharedPressure / neighborDensity;
-//				Totalpressure += direction * NearSmoothingSlope(dist) * nearSharedPressure / nearNeighborDensity;
-//			}
-//			
-//		}
-//		
-//
-//	}
-//	return Totalpressure;
-//}
+
+
+
 
 void GenerateParticle(GLfloat*& vertices, GLuint*& EBOIndices, int n) {
 	vertices[0] = 0.0;
@@ -160,17 +114,17 @@ void MakeParticleGrid(Particle particles[]) {
 	int counter = 0;
 
 	while (counter < NUM_PARTICLES) {
-		int max = (WIDTH - RADIUS) / ((RADIUS * 3));
+		int max = (WIDTH - RADIUS) / ((RADIUS * 2));
 		if (i % max == 0) {
 			j++;
 			i = 0;
 		}
 		Particle c;
 		c.size = n;
-		c.curr.x = RADIUS * 2 + i * RADIUS * 3;
-		c.curr.y = RADIUS + j * RADIUS * 3;
+		c.curr.x = RADIUS * 2 + i * RADIUS * 2;
+		c.curr.y = RADIUS + j * RADIUS * 2.5;
 		c.prev.y = c.curr.y; //static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (10))) * pow(-1, rand() % 2);;
-		c.prev.x = c.curr.x + static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (1))) * pow(-1, rand() % 2);
+		c.prev.x = c.curr.x +static_cast <float> (rand()) / (static_cast <float> (RAND_MAX / (1))) * pow(-1, rand() % 2);
 		c.acc.x = 0;
 		c.acc.y = 0;
 		particles[counter] = c;
