@@ -18,20 +18,22 @@
 #include <omp.h>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/string_cast.hpp>
-
 #include "Variables.h"
 #include "Particle.h"
 #include "Shader.h"
 #include "Boundry.h"
 
-
+bool hashError;
 Particle particles[MAX_PARTICLES];
 
 float SmoothingSlope(float dist) {
 	//if (dist > SMOOTHING_RADIUS) { return 0; }
-	//return (1.0f / 4.0f) * (float)pow((2.0f - (dist / SMOOTHING_RADIUS)), 3) / (float)(PI * pow(SMOOTHING_RADIUS, 3));
+	//if (dist <= SMOOTHING_RADIUS / 3.0f) {
+	//	return (1.0f / 4.0f) * (float)pow((2.0f - (dist / (float)SMOOTHING_RADIUS)), 7);// / (float)(PI * pow(SMOOTHING_RADIUS, 4));
+	//}
+	//return (1.0f / 4.0f) * (float)pow((2.0f - (dist / (float)SMOOTHING_RADIUS)), 5);// / (float)(PI * pow(SMOOTHING_RADIUS, 4));
 	if (0 > SMOOTHING_RADIUS - dist) { return 0; }
-	return (float)((3 * pow(SMOOTHING_RADIUS - dist, 2) * (10.0f / pow(SMOOTHING_RADIUS, 5) * PI)));
+	return (float)((3 * pow(SMOOTHING_RADIUS - dist, 3)));// *(10.0f / pow(SMOOTHING_RADIUS, 2) * PI)));
 }
 
 float DensityKernel(float dist) {
@@ -156,15 +158,30 @@ void CheckCollision(int j ,int i) {
 int getCellKey(int x, int y) {
 	x = (x / CELL_SIZE);
 	y = (y / CELL_SIZE);
+
+	
 	int hash = x * NUM_CELLS_X + y;//GetHashIndex(col, row) % (NUM_CELLS_X * NUM_CELLS_Y);//% NUM_PARTICLES;//maybe can recalculating is slow
 	return hash;
 	//make this take in a particle, use the particle index as the index to the hash and then just get the hash when getting cell particles
 }
 
 void AssignCell(const Particle& p, int i) {
+	
 	int x = p.curr.x / CELL_SIZE;
 	int y = p.curr.y / CELL_SIZE;
+
+	if (x == NUM_CELLS_X) {
+		x = NUM_CELLS_X - 1;
+	}
+	if (y == NUM_CELLS_Y) {
+		y = NUM_CELLS_Y - 1;
+	}
+
 	int hash = x * NUM_CELLS_X + y; //GetHashIndex(x, y) % (NUM_CELLS_X * NUM_CELLS_Y);// NUM_PARTICLES;
+	if (hash < 0 || hash > NUM_CELLS_X * NUM_CELLS_Y) {
+		//printf("ASSIGNCELL\n");
+		hashError = true;
+	}
 	hashes[i] = hash;
 	Tuple t;
 	t.hId = hash;
@@ -174,7 +191,7 @@ void AssignCell(const Particle& p, int i) {
 
 void PopulateGrid() {
 	for (int i = 0; i < NUM_PARTICLES; i++) {
-		particles[i].press = {};
+		particles[i].press = vec2(0,0);
 		AssignCell(particles[i], i);
 	}
 	//sorting slows down by a few frames, not sure if there are any better alternatives
@@ -197,15 +214,11 @@ void CalculatePressure(int pId1, int pId2) {
 			direction = { randSign(), randSign() };
 		}
 		float neighborDensity = densities[pId2];
-		
 		float neighborPressure = DensityToPressure(neighborDensity);
-		vec2 pressure = vec2(1.0f, 1.0f) * (float)(MASS)*SmoothingSlope(dist) * neighborPressure / neighborDensity;
-		printf("->(%f, %d)",dist, SmoothingSlope(dist));
-		cout << endl <<  "density" << neighborDensity << endl;
-		cout << "neighborpressure" << neighborPressure << endl;
-		cout << "Direction" << to_string(direction) << endl;
-		
-		cout << "PRESSURE" << to_string(pressure) << endl;
+		vec2 pressure = vec2(0, 0);
+		if (neighborDensity != 0) {
+			pressure = direction * (float)(MASS)*SmoothingSlope(dist) * neighborPressure / neighborDensity;
+		}
 
 
 		
@@ -278,8 +291,10 @@ void GetCellParticles(int cellKey, int i, int a=0) { //NEEDS TO BE RENAMED
 			}
 			else {
 				densities[i] += SmoothingSlope(dist) * MASS;
-				//printf("Density %f", densities[i]);
+
 			}
+			
+			
 			
 		}
 		else if (a == 2) {
@@ -395,8 +410,7 @@ void CalculateForces(Particle particles[MAX_PARTICLES]) {
 	HandleCollisions(1); //calculate densities
 	HandleCollisions(2);
 	for (int i = 0; i < NUM_PARTICLES; i++) {
-		//cout << to_string(particles[i].press);
-		particles[i].acc += particles[i].press;
+		particles[i].acc += particles[i].press / densities[i]; //uh
 	}
 }
 
@@ -443,12 +457,14 @@ void applyForces() {
 		particles[i].acc.x = 0;
 		densities[i] = 0;
 	}
+
 	CalculateForces(particles);
 	if (mouseForce) {
 		double xpos, ypos;
 		glfwGetCursorPos(window, &xpos, &ypos);
 		ApplyMouseForce(xpos, ypos);
 	}
+	
 }
 
 void Update(GLFWwindow* window) {
@@ -465,11 +481,20 @@ void Update(GLFWwindow* window) {
 	if (finalTime - initTime >= TIME_STEP) {
 		for (int i = 0; i < NUM_SUBSTEPS; i++) {
 			PopulateGrid();
+			
 			applyForces();
+
+			
 			HandleCollisions();
+			/*for (int i = 0; i < NUM_PARTICLES; i++) {
+				particles[i].prev = particles[i].curr;
+			}*/
+			
 			//ThreadedCollisions();
 			updatePositions();
+			
 			checkBounds();
+			
 
 		}
 		initTime = glfwGetTime();
@@ -531,6 +556,10 @@ void BeginSim() {
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 	shader.useShader();
+
+	printf("%d\n", NUM_CELLS_X);
+	printf("%d\n", NUM_CELLS_Y);
+
 	while (!glfwWindowShouldClose(window)) {
 		bool nextFrame = processInput(window);
 		if (!pause) {
@@ -584,5 +613,7 @@ int main() {
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	prevTime = glfwGetTime();
 	BeginSim();
+	hashError = false;
+	
 	return 0;
 }
